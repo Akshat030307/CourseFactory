@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import PUBLIC_HOST
 from app.db import lifespan
 from app.errors import install as install_error_handlers
-from app.routes import contradictions, graph, health, jobs, lectures, quiz, remediation, review_queue, search
+from app.routes import contradictions, graph, health, jobs, lectures, quiz, remediation, review_queue, search, upload
 from app.ws import router as ws_router
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -33,6 +33,7 @@ v1.include_router(remediation.router)
 v1.include_router(review_queue.router)
 v1.include_router(contradictions.router)
 v1.include_router(jobs.router)
+v1.include_router(upload.router)
 
 app.include_router(v1)
 app.include_router(ws_router)

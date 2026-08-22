@@ -53,10 +53,13 @@ async def compute_remediation(conn, question_id: str, student_id: str) -> Remedi
     concept_id = ctx["concept_id"]
     concept_label = ctx["concept_label"]
     current_sequence = ctx["lecture_sequence"]
+    course_id = ctx["course_id"]
 
-    candidates = await get_backward_prerequisites(conn, concept_id, max_depth=3)
+    candidates = await get_backward_prerequisites(conn, concept_id, course_id, max_depth=3)
     if candidates:
-        rows = await conn.fetch(load("remediation_candidates.sql"), [c["id"] for c in candidates], student_id)
+        rows = await conn.fetch(
+            load("remediation_candidates.sql"), [c["id"] for c in candidates], student_id, course_id
+        )
         by_id = {r["id"]: r for r in rows}
         hops_by_id = {c["id"]: c["hops"] for c in candidates}
 

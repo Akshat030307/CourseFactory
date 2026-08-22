@@ -166,12 +166,11 @@ Return strict JSON:
 {"edges": [{"from": "concept id", "to": "prerequisite concept id, must be one of that concept's earlier_candidates"}]}"""
 
 
-def slugify(label: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
-    return f"c_{slug}"
+def slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
 
 
-def merge_course(mentions: list[dict], lecture_titles: dict[str, str]) -> list[dict]:
+def merge_course(course_id: str, mentions: list[dict], lecture_titles: dict[str, str]) -> list[dict]:
     """One call across the whole course — cheap at fixture scale (4 lectures,
     a few dozen raw mentions) and the only way a merge call can see every
     lecture's concepts at once to de-duplicate across them."""
@@ -197,7 +196,18 @@ def merge_course(mentions: list[dict], lecture_titles: dict[str, str]) -> list[d
         members.sort(key=lambda m: (m["sequence"], m["timestamp_ms"]))
         introduced = members[0]
 
-        base_id = slugify(c["canonical_label"])
+        # Concept ids are a shared PRIMARY KEY across every course, and the
+        # AGE graph is one shared physical structure (course_graph), not one
+        # per course — course isolation depends entirely on ids never
+        # colliding. Course-namespacing them here is what actually
+        # guarantees that: two courses that both teach something called
+        # "Gaussian Elimination" would otherwise slugify to the identical
+        # c_gaussian_elimination and either crash this course's build on a
+        # primary-key violation, or (in AGE specifically, since its MERGE
+        # matches by id alone) silently repurpose the other course's
+        # existing graph node. Invisible with one course in the system;
+        # live the moment a second one exists.
+        base_id = f"c_{slugify(course_id)}_{slugify(c['canonical_label'])}"
         cid = base_id
         n = 2
         while cid in used_ids:
@@ -375,7 +385,7 @@ def main() -> None:
 
     print(f"merging {len(mentions)} raw mentions across {len(lectures)} lectures...")
     lecture_titles = {lec["id"]: lec["title"] for lec in lectures}
-    concepts = merge_course(mentions, lecture_titles)
+    concepts = merge_course(args.course_id, mentions, lecture_titles)
     print(f"merged to {len(concepts)} concepts")
 
     edges = link_edges(concepts)

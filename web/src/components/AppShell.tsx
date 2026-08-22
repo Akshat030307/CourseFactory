@@ -30,6 +30,8 @@ export function AppShell({ view }: AppShellProps) {
   const [searchParams] = useSearchParams();
   const routerNavigate = useNavigate();
   const activeContradiction = useActiveContradiction((s) => s.active);
+  const { data: lectures } = useLectures();
+  const currentLecture = lectures?.find((l) => l.id === id);
 
   // nav/navigate.ts is called from plain modules (SearchPanel, GraphPanel,
   // QuizPanel) that don't have router context of their own — this is where
@@ -69,6 +71,9 @@ export function AppShell({ view }: AppShellProps) {
           Course Factory
         </Link>
         <div className="flex gap-[var(--s-3)]">
+          <Link to="/upload" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
+            Upload a lecture
+          </Link>
           <Link to="/drill" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
             Due reviews
           </Link>
@@ -85,14 +90,18 @@ export function AppShell({ view }: AppShellProps) {
       <Column title="Stage" className="order-1 md:order-none">
         {activeContradiction ? (
           <SplitView contradiction={activeContradiction} />
-        ) : view === 'lecture' && id ? (
+        ) : view === 'lecture' && id && currentLecture ? (
           <div className="flex h-full flex-col gap-[var(--s-4)]">
-            <VideoPlayer lectureId={id} initialSeekMs={initialSeekMs} />
+            <VideoPlayer lectureId={id} videoUrl={currentLecture.video_url} initialSeekMs={initialSeekMs} />
             <BoardStrip lectureId={id} />
             <div className="min-h-0 flex-1 overflow-y-auto">
               <TranscriptLane lectureId={id} />
             </div>
           </div>
+        ) : view === 'lecture' && id && lectures ? (
+          <p className="text-[var(--error)]">
+            Lecture "{id}" not found. <Link to="/upload" className="underline underline-offset-2">Upload it</Link>?
+          </p>
         ) : (
           <p className="text-[var(--dust)]">Select a lecture from the course rail to begin.</p>
         )}

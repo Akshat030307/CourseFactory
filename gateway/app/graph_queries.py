@@ -74,16 +74,23 @@ async def get_edges_among(conn, ids: list[str]) -> list[dict]:
     return [{"from": _agtype(r["from_id"]), "to": _agtype(r["to_id"]), "type": "DEPENDS_ON"} for r in rows]
 
 
-async def get_backward_prerequisites(conn, concept_id: str, max_depth: int = 3) -> list[dict]:
+async def get_backward_prerequisites(conn, concept_id: str, course_id: str, max_depth: int = 3) -> list[dict]:
     """Every concept reachable by walking DEPENDS_ON backward from
     `concept_id`, up to `max_depth` hops — the candidate pool for R1's
     remediation query. Multiple paths can reach the same candidate at
     different lengths (diamond dependencies); returns the minimum hop
     count per candidate, sorted shallowest-first, since R1 wants the
-    nearest eligible prerequisite, not just any reachable one."""
+    nearest eligible prerequisite, not just any reachable one.
+
+    course_id filters `candidate` directly in the Cypher MATCH, not just in
+    the relational join afterward (remediation_candidates.sql filters again
+    too) — this is the one traversal that decides where to physically send
+    a student, so it gets checked at both layers rather than trusting edges
+    never cross courses (true today only because build_graph.py
+    course-namespaces every concept id it generates)."""
     rows = await conn.fetch(
         f"""SELECT * FROM cypher('course_graph', $$
-            MATCH path = (start:Concept {{id: {_cypher_str(concept_id)}}})-[:DEPENDS_ON*1..{max_depth}]->(candidate:Concept)
+            MATCH path = (start:Concept {{id: {_cypher_str(concept_id)}}})-[:DEPENDS_ON*1..{max_depth}]->(candidate:Concept {{course_id: {_cypher_str(course_id)}}})
             RETURN candidate.id, length(path)
         $$) AS (id agtype, hops agtype)"""
     )

@@ -1,63 +1,146 @@
-import { useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { GraphPanel } from './GraphPanel';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useLectures } from '../api/lectures';
-import { registerRouterContext } from '../nav/navigate';
 
-// The marketing entry point. Everything on this page is real: real course
-// data (useLectures), a real embedded GraphPanel (not a screenshot), real
-// cost figures (matches README's own Cost section), and real deep links
-// into the app pages built in Stages 0-10 — no fabricated multi-course
-// dashboard, no chat UI that isn't backed by anything.
-export function LandingPage() {
-  const routerNavigate = useNavigate();
-  const { data: lectures } = useLectures();
+// Local palette — deliberately not tokens.css's --written. That token is
+// LOAD-BEARING elsewhere (CLAUDE.md: marks board-only content, "using it
+// anywhere else destroys its meaning") — this page reuses the same gold
+// value as a literal, but scoped to this file only, not the shared tokens.
+const GOLD = '#E0B84C';
+const GOLD_DIM = '#8A7530';
+const CREAM = '#F0E6C8';
+const BLACK = '#000000';
+const PANEL = '#0D0D0D';
+const LINE = '#2A2410';
 
-  // GraphPanel's concept-node clicks go through nav/navigate.ts, which
-  // needs router context registered the same way AppShell does — there's
-  // no "current lecture" here, so every click is correctly cross-lecture
-  // (routes straight into the app at that concept's moment).
+// Scroll-reveal: fades/slides a section in once it enters the viewport.
+// Plain IntersectionObserver, no animation library — consistent with how
+// the rest of this app hand-rolls its one existing animation (tokens.css's
+// remediation-in keyframe). prefers-reduced-motion is handled for free by
+// tokens.css's existing global override, since this still just drives a
+// CSS transition/animation-duration.
+function Reveal({ children, delayMs = 0 }: { children: ReactNode; delayMs?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
   useEffect(() => {
-    registerRouterContext((path) => routerNavigate(path), null);
-    return () => registerRouterContext(null, null);
-  }, [routerNavigate]);
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.15 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
+  return (
+    <div
+      ref={ref}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(24px)',
+        transition: `opacity 700ms ease ${delayMs}ms, transform 700ms ease ${delayMs}ms`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function LandingPage() {
+  const { data: lectures } = useLectures();
   const firstLecture = lectures?.[0]?.id ?? 'l01';
 
   return (
-    <div className="min-h-screen bg-[var(--slate)] text-[var(--chalk)]">
+    <div style={{ background: BLACK, color: CREAM, minHeight: '100vh' }}>
+      <style>{`
+        @keyframes lp-glow-drift {
+          0%, 100% { transform: translate(-10%, -10%) scale(1); opacity: 0.5; }
+          50% { transform: translate(5%, 5%) scale(1.15); opacity: 0.8; }
+        }
+        @keyframes lp-fade-in-up {
+          from { opacity: 0; transform: translateY(28px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .lp-hero-glow {
+          position: absolute; inset: -20% -10% auto -10%; height: 600px;
+          background: radial-gradient(circle, rgba(224,184,76,0.22) 0%, rgba(224,184,76,0) 70%);
+          animation: lp-glow-drift 14s ease-in-out infinite;
+          pointer-events: none;
+        }
+        .lp-hero-item {
+          opacity: 0;
+          animation: lp-fade-in-up 800ms ease forwards;
+        }
+        .lp-card {
+          transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+        }
+        .lp-card:hover {
+          transform: translateY(-4px);
+          border-color: ${GOLD};
+          box-shadow: 0 8px 30px rgba(224,184,76,0.15);
+        }
+        .lp-btn { transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease; }
+        .lp-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(224,184,76,0.35); }
+        .lp-link { transition: color 180ms ease; }
+      `}</style>
+
       <Nav />
       <Hero firstLecture={firstLecture} />
-      <Differentiators />
-      <DemoMoments firstLecture={firstLecture} />
-      <HowItWorks />
-      <GraphPreview />
-      <Cost />
-      <Distribution />
-      <FooterCta firstLecture={firstLecture} />
+      <Reveal>
+        <Differentiators />
+      </Reveal>
+      <Reveal>
+        <DemoMoments firstLecture={firstLecture} />
+      </Reveal>
+      <Reveal>
+        <HowItWorks />
+      </Reveal>
+      <Reveal>
+        <Cost />
+      </Reveal>
+      <Reveal>
+        <Distribution />
+      </Reveal>
+      <Reveal>
+        <FooterCta firstLecture={firstLecture} />
+      </Reveal>
     </div>
   );
 }
 
 function Nav() {
   return (
-    <header className="flex items-center justify-between border-b border-[var(--slate-line)] px-[var(--s-5)] py-[var(--s-3)]">
-      <Link to="/" className="font-[var(--font-display)] text-[var(--step-1)] tracking-tight">
-        Course<span className="text-[var(--written)]">Factory</span>
+    <header
+      className="flex items-center justify-between px-[var(--s-5)] py-[var(--s-3)]"
+      style={{ borderBottom: `1px solid ${LINE}` }}
+    >
+      <Link to="/" className="font-[var(--font-display)] text-[var(--step-1)] tracking-tight" style={{ color: GOLD }}>
+        Course<span style={{ color: CREAM }}>Factory</span>
       </Link>
       <nav className="flex items-center gap-[var(--s-4)] text-[var(--step--1)]">
-        <Link to="/course/18.06" className="text-[var(--dust)] hover:text-[var(--chalk)]">
+        <Link to="/course/18.06" className="lp-link" style={{ color: CREAM }}>
           Dashboard
         </Link>
-        <Link to="/drill" className="text-[var(--dust)] hover:text-[var(--chalk)]">
+        <Link to="/drill" className="lp-link" style={{ color: CREAM }}>
           Due reviews
         </Link>
-        <Link to="/review" className="text-[var(--dust)] hover:text-[var(--chalk)]">
+        <Link to="/review" className="lp-link" style={{ color: CREAM }}>
           Instructor queue
+        </Link>
+        <Link to="/upload" className="lp-link" style={{ color: CREAM }}>
+          Upload
         </Link>
         <Link
           to="/lecture/l01"
-          className="rounded-[var(--radius)] bg-[var(--written)] px-[var(--s-3)] py-[var(--s-1)] text-[var(--slate)] font-medium hover:opacity-90"
+          className="lp-btn rounded-[var(--radius)] px-[var(--s-3)] py-[var(--s-1)] font-medium"
+          style={{ background: GOLD, color: BLACK }}
         >
           Try the Demo
         </Link>
@@ -68,36 +151,58 @@ function Nav() {
 
 function Hero({ firstLecture }: { firstLecture: string }) {
   return (
-    <section className="mx-auto flex max-w-4xl flex-col items-start gap-[var(--s-4)] px-[var(--s-5)] py-[var(--s-6)]">
-      <span className="rounded-full border border-[var(--slate-line)] px-[var(--s-2)] py-[var(--s-1)] text-[var(--step--1)] text-[var(--dust)]">
+    <section className="relative mx-auto flex max-w-4xl flex-col items-start gap-[var(--s-4)] overflow-hidden px-[var(--s-5)] py-[var(--s-6)]">
+      <div className="lp-hero-glow" />
+      <span
+        className="lp-hero-item rounded-full px-[var(--s-2)] py-[var(--s-1)] text-[var(--step--1)]"
+        style={{ border: `1px solid ${LINE}`, color: GOLD_DIM, animationDelay: '0ms' }}
+      >
         Built on RocketRide · runs entirely on localhost
       </span>
-      <h1 className="font-[var(--font-display)] text-[2.6rem] leading-tight md:text-[3.2rem]">
+      <h1
+        className="lp-hero-item font-[var(--font-display)] text-[2.6rem] leading-tight md:text-[3.2rem]"
+        style={{ color: GOLD, animationDelay: '80ms' }}
+      >
         Upload a lecture.
         <br />
         Get a course that knows what
         <br />
-        <span className="text-[var(--written)]">you don't understand yet.</span>
+        <span style={{ color: CREAM }}>you don't understand yet.</span>
       </h1>
-      <p className="max-w-2xl text-[var(--step-0)] text-[var(--dust)]">
+      <p
+        className="lp-hero-item max-w-2xl text-[var(--step-0)]"
+        style={{ color: CREAM, opacity: 0.85, animationDelay: '160ms' }}
+      >
         We read the board, reason across lectures, and send you to the exact ninety seconds —
         often in a <em>different</em> lecture — that fixes it.
       </p>
-      <div className="flex gap-[var(--s-3)]">
+      <div className="lp-hero-item flex flex-wrap gap-[var(--s-3)]" style={{ animationDelay: '240ms' }}>
+        <Link
+          to="/upload"
+          className="lp-btn rounded-[var(--radius)] px-[var(--s-4)] py-[var(--s-2)] font-medium"
+          style={{ background: GOLD, color: BLACK }}
+        >
+          Upload Your Lecture
+        </Link>
         <Link
           to={`/lecture/${firstLecture}`}
-          className="rounded-[var(--radius)] bg-[var(--written)] px-[var(--s-4)] py-[var(--s-2)] text-[var(--slate)] font-medium hover:opacity-90"
+          className="lp-btn rounded-[var(--radius)] px-[var(--s-4)] py-[var(--s-2)]"
+          style={{ border: `1px solid ${GOLD_DIM}`, color: GOLD }}
         >
           Try the Demo
         </Link>
         <a
           href="#how-it-works"
-          className="rounded-[var(--radius)] border border-[var(--slate-line)] px-[var(--s-4)] py-[var(--s-2)] text-[var(--chalk)] hover:bg-[var(--slate-raised)]"
+          className="lp-btn rounded-[var(--radius)] px-[var(--s-4)] py-[var(--s-2)]"
+          style={{ border: `1px solid ${LINE}`, color: CREAM }}
         >
           See How It Works
         </a>
       </div>
-      <div className="flex gap-[var(--s-4)] text-[var(--step--1)] text-[var(--dust)]">
+      <div
+        className="lp-hero-item flex gap-[var(--s-4)] text-[var(--step--1)]"
+        style={{ color: GOLD_DIM, animationDelay: '320ms' }}
+      >
         <span>⏵ Runs locally</span>
         <span>⏵ ~1.5¢ per lecture</span>
         <span>⏵ No model downloads</span>
@@ -122,15 +227,23 @@ function Differentiators() {
     },
   ];
   return (
-    <section className="border-t border-[var(--slate-line)] px-[var(--s-5)] py-[var(--s-6)]">
-      <h2 className="mb-[var(--s-4)] text-center font-[var(--font-display)] text-[var(--step-2)]">
+    <section className="px-[var(--s-5)] py-[var(--s-6)]" style={{ borderTop: `1px solid ${LINE}` }}>
+      <h2 className="mb-[var(--s-4)] text-center font-[var(--font-display)] text-[var(--step-2)]" style={{ color: GOLD }}>
         What makes it different
       </h2>
       <div className="mx-auto grid max-w-5xl gap-[var(--s-4)] md:grid-cols-3">
         {items.map((it) => (
-          <div key={it.title} className="rounded-[var(--radius-lg)] border border-[var(--slate-line)] bg-[var(--slate-raised)] p-[var(--s-4)]">
-            <h3 className="mb-[var(--s-2)] text-[var(--step-1)] text-[var(--written)]">{it.title}</h3>
-            <p className="text-[var(--step--1)] text-[var(--dust)]">{it.body}</p>
+          <div
+            key={it.title}
+            className="lp-card rounded-[var(--radius-lg)] p-[var(--s-4)]"
+            style={{ border: `1px solid ${LINE}`, background: PANEL }}
+          >
+            <h3 className="mb-[var(--s-2)] text-[var(--step-1)]" style={{ color: GOLD }}>
+              {it.title}
+            </h3>
+            <p className="text-[var(--step--1)]" style={{ color: CREAM, opacity: 0.75 }}>
+              {it.body}
+            </p>
           </div>
         ))}
       </div>
@@ -170,26 +283,18 @@ function DemoMoments({ firstLecture }: { firstLecture: string }) {
     },
   ];
   return (
-    <section className="border-t border-[var(--slate-line)] px-[var(--s-5)] py-[var(--s-6)]">
-      <h2 className="mb-[var(--s-4)] text-center font-[var(--font-display)] text-[var(--step-2)]">
+    <section className="px-[var(--s-5)] py-[var(--s-6)]" style={{ borderTop: `1px solid ${LINE}` }}>
+      <h2 className="mb-[var(--s-4)] text-center font-[var(--font-display)] text-[var(--step-2)]" style={{ color: GOLD }}>
         Four demo moments
       </h2>
       <div className="mx-auto grid max-w-5xl gap-[var(--s-3)] md:grid-cols-4">
         {moments.map((m) =>
           m.to.startsWith('#') ? (
-            <a
-              key={m.n}
-              href={m.to}
-              className="flex flex-col gap-[var(--s-1)] rounded-[var(--radius)] border border-[var(--slate-line)] p-[var(--s-3)] hover:bg-[var(--slate-raised)]"
-            >
+            <a key={m.n} href={m.to} className="lp-card flex flex-col gap-[var(--s-1)] rounded-[var(--radius)] p-[var(--s-3)]" style={{ border: `1px solid ${LINE}` }}>
               <MomentBody m={m} />
             </a>
           ) : (
-            <Link
-              key={m.n}
-              to={m.to}
-              className="flex flex-col gap-[var(--s-1)] rounded-[var(--radius)] border border-[var(--slate-line)] p-[var(--s-3)] hover:bg-[var(--slate-raised)]"
-            >
+            <Link key={m.n} to={m.to} className="lp-card flex flex-col gap-[var(--s-1)] rounded-[var(--radius)] p-[var(--s-3)]" style={{ border: `1px solid ${LINE}` }}>
               <MomentBody m={m} />
             </Link>
           ),
@@ -202,10 +307,18 @@ function DemoMoments({ firstLecture }: { firstLecture: string }) {
 function MomentBody({ m }: { m: { n: string; title: string; body: string; hint: string } }) {
   return (
     <>
-      <span className="ts text-[var(--written)]">{m.n}</span>
-      <h3 className="text-[var(--step-0)]">{m.title}</h3>
-      <p className="text-[var(--step--1)] text-[var(--dust)]">{m.body}</p>
-      <p className="mt-[var(--s-1)] text-[var(--step--1)] text-[var(--path)]">{m.hint} →</p>
+      <span className="ts" style={{ color: GOLD }}>
+        {m.n}
+      </span>
+      <h3 className="text-[var(--step-0)]" style={{ color: CREAM }}>
+        {m.title}
+      </h3>
+      <p className="text-[var(--step--1)]" style={{ color: CREAM, opacity: 0.7 }}>
+        {m.body}
+      </p>
+      <p className="mt-[var(--s-1)] text-[var(--step--1)]" style={{ color: GOLD }}>
+        {m.hint} →
+      </p>
     </>
   );
 }
@@ -218,37 +331,34 @@ function HowItWorks() {
     { n: 4, title: 'Diagnose & guide', body: 'Find gaps. Send students to the exact fix.' },
   ];
   return (
-    <section id="how-it-works" className="border-t border-[var(--slate-line)] px-[var(--s-5)] py-[var(--s-6)]">
-      <h2 className="mb-[var(--s-4)] text-center font-[var(--font-display)] text-[var(--step-2)]">How it works</h2>
+    <section id="how-it-works" className="px-[var(--s-5)] py-[var(--s-6)]" style={{ borderTop: `1px solid ${LINE}` }}>
+      <h2 className="mb-[var(--s-4)] text-center font-[var(--font-display)] text-[var(--step-2)]" style={{ color: GOLD }}>
+        How it works
+      </h2>
       <div className="mx-auto flex max-w-5xl flex-col gap-[var(--s-3)] md:flex-row md:items-start">
         {steps.map((s, i) => (
           <div key={s.n} className="flex flex-1 items-start gap-[var(--s-3)] md:flex-col">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--written)] text-[var(--written)]">
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+              style={{ border: `1px solid ${GOLD}`, color: GOLD }}
+            >
               {s.n}
             </span>
             <div>
-              <h3 className="text-[var(--step-0)]">{s.title}</h3>
-              <p className="text-[var(--step--1)] text-[var(--dust)]">{s.body}</p>
+              <h3 className="text-[var(--step-0)]" style={{ color: CREAM }}>
+                {s.title}
+              </h3>
+              <p className="text-[var(--step--1)]" style={{ color: CREAM, opacity: 0.7 }}>
+                {s.body}
+              </p>
             </div>
-            {i < steps.length - 1 && <span className="hidden text-[var(--dust)] md:block">→</span>}
+            {i < steps.length - 1 && (
+              <span className="hidden md:block" style={{ color: GOLD_DIM }}>
+                →
+              </span>
+            )}
           </div>
         ))}
-      </div>
-    </section>
-  );
-}
-
-function GraphPreview() {
-  return (
-    <section className="border-t border-[var(--slate-line)] px-[var(--s-5)] py-[var(--s-6)]">
-      <h2 className="mb-[var(--s-1)] text-center font-[var(--font-display)] text-[var(--step-2)]">
-        The prerequisite graph, live
-      </h2>
-      <p className="mb-[var(--s-4)] text-center text-[var(--step--1)] text-[var(--dust)]">
-        This is the real course graph — click a concept to jump straight into the lecture that teaches it.
-      </p>
-      <div className="mx-auto max-w-3xl rounded-[var(--radius-lg)] border border-[var(--slate-line)] bg-[var(--slate-raised)] p-[var(--s-4)]">
-        <GraphPanel />
       </div>
     </section>
   );
@@ -263,19 +373,27 @@ function Cost() {
     { label: 'Embeddings', value: '~$0.001 (OpenAI)' },
   ];
   return (
-    <section className="border-t border-[var(--slate-line)] px-[var(--s-5)] py-[var(--s-6)]">
-      <h2 className="mb-[var(--s-1)] text-center font-[var(--font-display)] text-[var(--step-2)]">
-        Costs <span className="text-[var(--written)]">~1.5¢</span> per lecture
+    <section className="px-[var(--s-5)] py-[var(--s-6)]" style={{ borderTop: `1px solid ${LINE}` }}>
+      <h2 className="mb-[var(--s-1)] text-center font-[var(--font-display)] text-[var(--step-2)]" style={{ color: CREAM }}>
+        Costs <span style={{ color: GOLD }}>~1.5¢</span> per lecture
       </h2>
       <div className="mx-auto mt-[var(--s-4)] grid max-w-3xl gap-[var(--s-3)] sm:grid-cols-5">
         {rows.map((r) => (
-          <div key={r.label} className="rounded-[var(--radius)] border border-[var(--slate-line)] p-[var(--s-2)] text-center">
-            <p className="text-[var(--step--1)] text-[var(--dust)]">{r.label}</p>
-            <p className="ts mt-[var(--s-1)]">{r.value}</p>
+          <div
+            key={r.label}
+            className="lp-card rounded-[var(--radius)] p-[var(--s-2)] text-center"
+            style={{ border: `1px solid ${LINE}` }}
+          >
+            <p className="text-[var(--step--1)]" style={{ color: CREAM, opacity: 0.6 }}>
+              {r.label}
+            </p>
+            <p className="ts mt-[var(--s-1)]" style={{ color: GOLD }}>
+              {r.value}
+            </p>
           </div>
         ))}
       </div>
-      <p className="mx-auto mt-[var(--s-4)] max-w-2xl text-center text-[var(--step--1)] text-[var(--dust)]">
+      <p className="mx-auto mt-[var(--s-4)] max-w-2xl text-center text-[var(--step--1)]" style={{ color: CREAM, opacity: 0.55 }}>
         No ML model weights load locally — not to save memory, but to save setup time. A torch
         install and a multi-gigabyte model download is two hours that buys nothing the demo needs.
       </p>
@@ -293,14 +411,16 @@ function Distribution() {
   }
 }`;
   return (
-    <section id="distribution" className="border-t border-[var(--slate-line)] px-[var(--s-5)] py-[var(--s-6)]">
-      <h2 className="mb-[var(--s-4)] text-center font-[var(--font-display)] text-[var(--step-2)]">
+    <section id="distribution" className="px-[var(--s-5)] py-[var(--s-6)]" style={{ borderTop: `1px solid ${LINE}` }}>
+      <h2 className="mb-[var(--s-4)] text-center font-[var(--font-display)] text-[var(--step-2)]" style={{ color: GOLD }}>
         Turn any lecture into your smartest teacher
       </h2>
       <div className="mx-auto grid max-w-4xl gap-[var(--s-4)] md:grid-cols-2">
-        <div className="rounded-[var(--radius-lg)] border border-[var(--slate-line)] bg-[var(--slate-raised)] p-[var(--s-4)]">
-          <h3 className="mb-[var(--s-2)] text-[var(--step-0)]">Telegram bot</h3>
-          <p className="mb-[var(--s-3)] text-[var(--step--1)] text-[var(--dust)]">
+        <div className="lp-card rounded-[var(--radius-lg)] p-[var(--s-4)]" style={{ border: `1px solid ${LINE}`, background: PANEL }}>
+          <h3 className="mb-[var(--s-2)] text-[var(--step-0)]" style={{ color: GOLD }}>
+            Telegram bot
+          </h3>
+          <p className="mb-[var(--s-3)] text-[var(--step--1)]" style={{ color: CREAM, opacity: 0.75 }}>
             Long polling, so it works from localhost with no tunnel. Scan to ask questions and take
             due reviews from your phone.
           </p>
@@ -310,13 +430,15 @@ function Distribution() {
             className="h-32 w-32 rounded-[var(--radius)] bg-white p-[var(--s-2)]"
           />
         </div>
-        <div className="rounded-[var(--radius-lg)] border border-[var(--slate-line)] bg-[var(--slate-raised)] p-[var(--s-4)]">
-          <h3 className="mb-[var(--s-2)] text-[var(--step-0)]">MCP in Claude Desktop</h3>
-          <p className="mb-[var(--s-3)] text-[var(--step--1)] text-[var(--dust)]">
+        <div className="lp-card rounded-[var(--radius-lg)] p-[var(--s-4)]" style={{ border: `1px solid ${LINE}`, background: PANEL }}>
+          <h3 className="mb-[var(--s-2)] text-[var(--step-0)]" style={{ color: GOLD }}>
+            MCP in Claude Desktop
+          </h3>
+          <p className="mb-[var(--s-3)] text-[var(--step--1)]" style={{ color: CREAM, opacity: 0.75 }}>
             Search, explain, and find prerequisites — from inside Claude Desktop, backed by the same
             transcript and board data. Add to <code className="ts">claude_desktop_config.json</code>:
           </p>
-          <pre className="overflow-x-auto rounded-[var(--radius)] bg-[var(--slate)] p-[var(--s-2)] text-[var(--step--1)] text-[var(--chalk)]">
+          <pre className="overflow-x-auto rounded-[var(--radius)] p-[var(--s-2)] text-[var(--step--1)]" style={{ background: BLACK, color: CREAM }}>
             <code>{claudeConfig}</code>
           </pre>
         </div>
@@ -327,15 +449,16 @@ function Distribution() {
 
 function FooterCta({ firstLecture }: { firstLecture: string }) {
   return (
-    <footer className="border-t border-[var(--slate-line)] px-[var(--s-5)] py-[var(--s-6)] text-center">
-      <div className="flex justify-center gap-[var(--s-5)] text-[var(--step--1)] text-[var(--dust)]">
+    <footer className="px-[var(--s-5)] py-[var(--s-6)] text-center" style={{ borderTop: `1px solid ${LINE}` }}>
+      <div className="flex flex-wrap justify-center gap-[var(--s-5)] text-[var(--step--1)]" style={{ color: CREAM, opacity: 0.6 }}>
         <span>✓ No model downloads</span>
         <span>✓ Runs locally</span>
         <span>✓ Built for speed. Built for learning.</span>
       </div>
       <Link
         to={`/lecture/${firstLecture}`}
-        className="mt-[var(--s-4)] inline-block rounded-[var(--radius)] bg-[var(--written)] px-[var(--s-5)] py-[var(--s-2)] text-[var(--slate)] font-medium hover:opacity-90"
+        className="lp-btn mt-[var(--s-4)] inline-block rounded-[var(--radius)] px-[var(--s-5)] py-[var(--s-2)] font-medium"
+        style={{ background: GOLD, color: BLACK }}
       >
         Get Started for Free
       </Link>

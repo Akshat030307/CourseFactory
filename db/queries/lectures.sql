@@ -7,6 +7,10 @@ SELECT
     l.sequence,
     l.duration_ms,
     l.status,
+    -- l01-l04's fixtures never had source_path populated (predates the
+    -- upload flow) — falls back to the <id>.mp4 convention they were
+    -- actually ingested under, so this stays correct for both.
+    '/lectures/' || COALESCE(NULLIF(l.source_path, ''), l.id || '.mp4') AS video_url,
     (
         SELECT avg(m.score)
         FROM concepts c

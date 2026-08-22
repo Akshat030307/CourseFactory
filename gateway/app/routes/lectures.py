@@ -14,6 +14,7 @@ class Lecture(BaseModel):
     sequence: int
     duration_ms: int | None
     status: str
+    video_url: str
     mastery: float | None
 
 

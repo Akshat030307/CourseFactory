@@ -4,6 +4,10 @@ import { setPlayerTime } from '../player/playerTimeStore';
 
 interface VideoPlayerProps {
   lectureId: string;
+  // Real path to the source file, from GET /lectures — upload (Stage 12)
+  // means this is no longer always `${lectureId}.mp4`: a .webm upload keeps
+  // its real extension, and hardcoding .mp4 would 404 it.
+  videoUrl: string;
   // Set from the `?t=` query param (see nav/navigate.ts) when a
   // cross-lecture navigate() lands here — applied once on mount, before
   // this component has a chance to register with playerControls the normal
@@ -11,7 +15,7 @@ interface VideoPlayerProps {
   initialSeekMs?: number;
 }
 
-export function VideoPlayer({ lectureId, initialSeekMs }: VideoPlayerProps) {
+export function VideoPlayer({ lectureId, videoUrl, initialSeekMs }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -44,7 +48,7 @@ export function VideoPlayer({ lectureId, initialSeekMs }: VideoPlayerProps) {
     <video
       ref={videoRef}
       key={lectureId}
-      src={`/lectures/${lectureId}.mp4`}
+      src={videoUrl}
       controls
       // No height cap here meant the browser sized the video by intrinsic
       // aspect ratio at full width — 966px tall on real footage, taller than
