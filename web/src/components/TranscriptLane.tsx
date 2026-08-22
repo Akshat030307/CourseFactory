@@ -53,7 +53,7 @@ export function TranscriptLane({ lectureId }: TranscriptLaneProps) {
 
   if (isLoading) return <p className="text-[var(--dust)]">Loading transcript…</p>;
   if (error) return <p className="text-[var(--error)]">Couldn't load the transcript. Try reloading.</p>;
-  if (!segments?.length) return <p className="text-[var(--dust)]">No transcript yet.</p>;
+  if (!segments?.length) return <p className="text-[var(--dust)]">No transcript yet — ingest this lecture with scripts/ingest.py.</p>;
 
   return (
     <div className="flex flex-col gap-[var(--s-1)]">

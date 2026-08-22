@@ -23,7 +23,7 @@ export function SplitView({ contradiction }: { contradiction: Contradiction }) {
         </button>
       </div>
       {contradiction.note && <p className="text-[var(--chalk)]">{contradiction.note}</p>}
-      <div className="grid flex-1 grid-cols-2 gap-[var(--s-4)]">
+      <div className="grid flex-1 grid-cols-1 gap-[var(--s-4)] sm:grid-cols-2">
         <MomentCard claim={contradiction.claim_a} />
         <MomentCard claim={contradiction.claim_b} />
       </div>

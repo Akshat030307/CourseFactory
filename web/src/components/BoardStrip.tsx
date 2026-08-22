@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { type Frame, useFrames } from '../api/frames';
 import { useSegments } from '../api/segments';
 import { isPlaying, seekTo } from '../player/playerControls';
@@ -31,6 +32,8 @@ export function BoardStrip({ lectureId }: BoardStripProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const activeRef = useRef<HTMLButtonElement | null>(null);
   const highlightedIds = useSearchHighlights((s) => s.frameIds);
+  const setHighlights = useSearchHighlights((s) => s.setHighlights);
+  const [searchParams] = useSearchParams();
 
   const onTick = useCallback(
     (ms: number) => {
@@ -92,9 +95,28 @@ export function BoardStrip({ lectureId }: BoardStripProps) {
     }
   }, [highlightedIds]);
 
+  // P2 deep links: a URL like /lecture/l02?t=44520&lane=board (the exact
+  // shape scripts/mcp_server.py's deep_link() already emits) should land
+  // looking the same as if the student had just run that written-lane
+  // search themselves — highlight the nearest board frame, same gold border
+  // and auto-scroll a live search's onSuccess already produces (S3). Only
+  // 'board' has anything to restore; 'transcript'/'both' need no action
+  // since the transcript's active-line highlight is already time-based.
+  useEffect(() => {
+    if (!frames?.length) return;
+    if (searchParams.get('lane') !== 'board') return;
+    const t = searchParams.get('t');
+    if (t === null) return;
+    const targetMs = Number(t);
+    const nearest = frames.reduce((best, f) =>
+      Math.abs(f.timestamp_ms - targetMs) < Math.abs(best.timestamp_ms - targetMs) ? f : best,
+    );
+    setHighlights([nearest.id]);
+  }, [frames, searchParams, setHighlights]);
+
   if (isLoading) return <p className="text-[var(--dust)]">Loading board states…</p>;
   if (error) return <p className="text-[var(--error)]">Couldn't load board states. Try reloading.</p>;
-  if (!frames?.length) return null;
+  if (!frames?.length) return <p className="text-[var(--dust)]">No board states for this lecture.</p>;
 
   const hoveredFrame = frames.find((f) => f.id === hoveredId);
   const hoverText = hoveredFrame && (hoveredFrame.vision_description || hoveredFrame.ocr_text);

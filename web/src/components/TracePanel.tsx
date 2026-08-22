@@ -6,7 +6,7 @@ export function TracePanel() {
   const jobId = latestJob?.status === 'running' ? latestJob.id : null;
   const trace = useJobTrace(jobId);
 
-  if (!latestJob) return <p className="text-[var(--dust)]">No ingestion jobs yet.</p>;
+  if (!latestJob) return <p className="text-[var(--dust)]">No ingestion jobs yet — run scripts/ingest.py to start one.</p>;
 
   if (latestJob.status !== 'running') {
     return (

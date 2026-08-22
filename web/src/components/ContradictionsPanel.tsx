@@ -8,7 +8,7 @@ export function ContradictionsPanel() {
   const setActive = useActiveContradiction((s) => s.setActive);
 
   if (isPending) return <p className="text-[var(--dust)]">Loading…</p>;
-  if (isError) return <p className="text-[var(--error)]">Couldn't load contradictions.</p>;
+  if (isError) return <p className="text-[var(--error)]">Couldn't load contradictions. Try reloading.</p>;
   if (contradictions.length === 0) return <p className="text-[var(--dust)]">None detected.</p>;
 
   return (

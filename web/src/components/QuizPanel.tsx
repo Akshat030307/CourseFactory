@@ -19,7 +19,7 @@ export function QuizPanel({ lectureId }: QuizPanelProps) {
   const [result, setResult] = useState<AttemptResult | null>(null);
 
   if (isPending) return <p className="text-[var(--dust)]">Loading quiz…</p>;
-  if (isError) return <p className="text-[var(--error)]">Couldn't load the quiz.</p>;
+  if (isError) return <p className="text-[var(--error)]">Couldn't load the quiz. Try reloading.</p>;
   if (questions.length === 0) {
     return <p className="text-[var(--dust)]">No approved questions for this lecture yet.</p>;
   }

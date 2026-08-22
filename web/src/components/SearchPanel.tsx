@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type Lane, useSearch } from '../api/search';
 import { navigate } from '../nav/navigate';
 import { useSearchHighlights } from '../search/searchHighlights';
@@ -19,6 +19,23 @@ export function SearchPanel() {
   const search = useSearch();
   const setHighlights = useSearchHighlights((s) => s.setHighlights);
   const clearHighlights = useSearchHighlights((s) => s.clear);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // P3: "/" focuses search, from anywhere in the app that isn't already a
+  // text input — same target-tag guard BoardStrip's own arrow-key handler
+  // (B5) already uses, so typing a literal "/" into another field still works.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      if (e.key === '/') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,10 +64,11 @@ export function SearchPanel() {
     <div className="flex flex-col gap-[var(--s-3)]">
       <form onSubmit={onSubmit} className="flex flex-col gap-[var(--s-2)]">
         <input
+          ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search this course…"
+          placeholder="Search this course… (/)"
           className="rounded-[var(--radius)] border border-[var(--slate-line)] bg-[var(--slate)] px-[var(--s-2)] py-[var(--s-1)] text-[var(--chalk)] placeholder:text-[var(--dust-faint)]"
         />
         <div className="flex gap-[var(--s-1)]">
@@ -83,7 +101,7 @@ export function SearchPanel() {
           {transcriptHits.map((hit) => (
             <button
               key={`${hit.lecture_id}-${hit.timestamp_ms}`}
-              onClick={() => navigate(hit.lecture_id, hit.timestamp_ms)}
+              onClick={() => navigate(hit.lecture_id, hit.timestamp_ms, 'transcript')}
               className="rounded-[var(--radius)] border border-[var(--slate-line)] bg-[var(--slate-raised)] p-[var(--s-2)] text-left"
             >
               <div className="ts">

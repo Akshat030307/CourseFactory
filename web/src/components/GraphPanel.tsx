@@ -13,13 +13,31 @@ const COURSE_ID = '18.06';
 // BoardStrip's un-exercised windowing params (B5).
 const MAX_VISIBLE_NODES = 60;
 
-type ClusterNode = { kind: 'cluster'; id: string; label: string; lectureId: string; count: number };
+type ClusterNode = { kind: 'cluster'; id: string; label: string; lectureId: string; count: number; avgMastery: number | null };
 type ConceptNode = { kind: 'concept'; id: string; label: string; lectureId: string; timestampMs: number; mastery: number | null };
 type VizNode = ClusterNode | ConceptNode;
 type VizLink = { source: string; target: string; to_concept_edges: number };
 
 function clusterId(lectureId: string): string {
   return `lecture:${lectureId}`;
+}
+
+// P1: tint by mastery.score instead of a flat color — the collapsed cluster
+// view (the default) is the one place a student/instructor sees the whole
+// course at once, so it's the one place a mastery dashboard actually pays
+// off. null (never attempted) stays a neutral fallback color rather than
+// getting pulled toward "struggling" — no data isn't the same claim as low
+// mastery. Threshold-free gradient (not a hard cutoff) since R1's own
+// MASTERY_THRESHOLD=0.6 already exists server-side for eligibility — this
+// is a continuous readout, not a second copy of that decision.
+const MASTERY_LOW = [0xc9, 0x70, 0x64]; // --error
+const MASTERY_HIGH = [0x7f, 0xa8, 0x6f]; // --ok
+
+function masteryColor(mastery: number | null, fallback: string): string {
+  if (mastery === null) return fallback;
+  const t = Math.max(0, Math.min(1, mastery));
+  const rgb = MASTERY_LOW.map((c, i) => Math.round(c + (MASTERY_HIGH[i] - c) * t));
+  return `rgb(${rgb.join(',')})`;
 }
 
 export function GraphPanel() {
@@ -66,7 +84,7 @@ export function GraphPanel() {
   }
 
   if (isPending) return <p className="text-[var(--dust)]">Loading graph…</p>;
-  if (isError) return <p className="text-[var(--error)]">Couldn't load the concept graph.</p>;
+  if (isError) return <p className="text-[var(--error)]">Couldn't load the concept graph. Check the gateway is running, then reload.</p>;
   if (nodes.length === 0) return <p className="text-[var(--dust)]">No concepts extracted yet — run scripts/build_graph.py.</p>;
 
   return (
@@ -74,6 +92,10 @@ export function GraphPanel() {
       <p className="text-[var(--step--1)] text-[var(--dust)]">
         {expanded.size === 0 ? 'Click a lecture to expand its concepts.' : `${expanded.size} lecture${expanded.size === 1 ? '' : 's'} expanded.`}
         {truncated && ` Showing first ${MAX_VISIBLE_NODES} nodes.`}
+      </p>
+      <p className="text-[var(--step--1)] text-[var(--dust)]">
+        Node color: <span style={{ color: masteryColor(0, '#8E948C') }}>struggling</span> →{' '}
+        <span style={{ color: masteryColor(1, '#8E948C') }}>mastered</span>, gray = not yet attempted.
       </p>
       <div ref={containerRef} className="min-h-[280px] flex-1 overflow-hidden rounded-[var(--radius)] border border-[var(--slate-line)]">
         <ForceGraph2D
@@ -83,7 +105,12 @@ export function GraphPanel() {
           nodeId="id"
           nodeLabel={(n) => (n as VizNode).label}
           nodeVal={(n) => ((n as VizNode).kind === 'cluster' ? 6 + (n as ClusterNode).count : 4)}
-          nodeColor={(n) => ((n as VizNode).kind === 'cluster' ? '#6BA8B8' : '#8E948C')}
+          nodeColor={(n) => {
+            const node = n as VizNode;
+            return node.kind === 'cluster'
+              ? masteryColor(node.avgMastery, '#6BA8B8')
+              : masteryColor(node.mastery, '#8E948C');
+          }}
           linkColor={() => 'rgba(107, 168, 184, 0.55)'}
           linkDirectionalArrowLength={4}
           linkDirectionalArrowRelPos={1}
@@ -121,7 +148,9 @@ function buildViz(
     } else {
       const cid = clusterId(lectureId);
       for (const c of concepts) visibleIdFor.set(c.id, cid);
-      nodes.push({ kind: 'cluster', id: cid, label: lectureTitle.get(lectureId) ?? lectureId, lectureId, count: concepts.length });
+      const known = concepts.filter((c) => c.mastery !== null);
+      const avgMastery = known.length > 0 ? known.reduce((sum, c) => sum + c.mastery!, 0) / known.length : null;
+      nodes.push({ kind: 'cluster', id: cid, label: lectureTitle.get(lectureId) ?? lectureId, lectureId, count: concepts.length, avgMastery });
     }
   }
 

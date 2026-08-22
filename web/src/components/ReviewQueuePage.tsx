@@ -35,7 +35,7 @@ export function ReviewQueuePage() {
       </div>
 
       {isPending && <p className="text-[var(--dust)]">Loading…</p>}
-      {isError && <p className="text-[var(--error)]">Couldn't load the review queue.</p>}
+      {isError && <p className="text-[var(--error)]">Couldn't load the review queue. Try reloading.</p>}
       {items && items.length === 0 && <p className="text-[var(--dust)]">Nothing waiting for review.</p>}
 
       {[...groups.entries()].map(([conceptId, group]) => (
@@ -60,7 +60,7 @@ export function ReviewQueuePage() {
               {item.frame_thumb_url && (
                 <img src={item.frame_thumb_url} alt="" className="h-20 w-32 shrink-0 rounded-[var(--radius)] object-cover" />
               )}
-              <div className="flex flex-1 flex-col gap-[var(--s-1)]">
+              <div className="flex min-w-0 flex-1 flex-col gap-[var(--s-1)]">
                 <div className="ts">
                   {item.lecture_title} · {formatTimestamp(item.source_timestamp_ms)}
                 </div>

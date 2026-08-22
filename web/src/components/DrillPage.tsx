@@ -58,7 +58,7 @@ export function DrillPage() {
       </div>
 
       {isPending && <p className="text-[var(--dust)]">Loading…</p>}
-      {isError && <p className="text-[var(--error)]">Couldn't load your review schedule.</p>}
+      {isError && <p className="text-[var(--error)]">Couldn't load your review schedule. Try reloading.</p>}
 
       {/* current, not due — see the lock-in comment above. Once the last
           question is answered, `due` goes empty but `current` (and its

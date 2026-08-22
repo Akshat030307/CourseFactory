@@ -18,13 +18,23 @@ export function registerRouterContext(fn: RouterNavigate | null, lectureId: stri
   currentLectureId = lectureId;
 }
 
+// P2: deep links. `lane` matches the vocabulary scripts/mcp_server.py's own
+// deep_link() already emits (a search result's `source`: 'transcript' |
+// 'board', or 'both' when not lane-specific) — this is the consumer side of
+// a contract D1 already produces, not a new one. Only 'board' currently
+// changes what the landing page shows (BoardStrip restores the highlight a
+// live written-lane search would have set); 'transcript' is accepted for
+// URL-shape consistency but needs no restoration since TranscriptLane's
+// active-segment highlight is already time-based, not search-based.
+type Lane = 'transcript' | 'board' | 'both';
+
 // Same-lecture: seeks immediately, no route change, nothing pushed (not a
 // lecture change — rule 6 only applies when lectureId actually changes).
 // Cross-lecture: pushes {currentLectureId, current player ms} so
 // returnToOrigin() can get back, then navigates to
 // `/lecture/{target}?t={ms}` — VideoPlayer reads `?t=` on mount and seeks
 // once the new player's registered (see AppShell/VideoPlayer).
-export function navigate(targetLectureId: string, targetMs: number): void {
+export function navigate(targetLectureId: string, targetMs: number, lane?: Lane): void {
   if (targetLectureId === currentLectureId) {
     seekTo(targetLectureId, targetMs);
     return;
@@ -36,7 +46,8 @@ export function navigate(targetLectureId: string, targetMs: number): void {
   if (currentLectureId) {
     useNavStack.getState().push({ lectureId: currentLectureId, ms: getPlayerTime() });
   }
-  routerNavigate(`/lecture/${targetLectureId}?t=${targetMs}`);
+  const laneParam = lane ? `&lane=${lane}` : '';
+  routerNavigate(`/lecture/${targetLectureId}?t=${targetMs}${laneParam}`);
 }
 
 export function returnToOrigin(): void {
