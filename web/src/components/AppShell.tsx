@@ -65,7 +65,9 @@ export function AppShell({ view }: AppShellProps) {
     <div className="flex min-h-screen flex-col md:grid md:h-screen md:grid-cols-[240px_1fr_360px] md:grid-rows-[56px_1fr] md:overflow-hidden">
       <ReturnPill />
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-[var(--s-3)] gap-y-[var(--s-1)] border-b border-[var(--slate-line)] px-[var(--s-4)] py-[var(--s-2)] md:col-span-3 md:py-0">
-        <span className="font-[var(--font-display)] text-[var(--step-1)]">Course Factory</span>
+        <Link to="/" className="font-[var(--font-display)] text-[var(--step-1)]">
+          Course Factory
+        </Link>
         <div className="flex gap-[var(--s-3)]">
           <Link to="/drill" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
             Due reviews

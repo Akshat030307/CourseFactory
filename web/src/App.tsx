@@ -1,6 +1,7 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { DrillPage } from './components/DrillPage';
+import { LandingPage } from './components/LandingPage';
 import { ReviewQueuePage } from './components/ReviewQueuePage';
 
 function App() {
@@ -15,9 +16,9 @@ function App() {
         {/* X4 (Stage 9): instructor-facing, no auth to gate it behind —
             its own route, same reasoning as /drill. */}
         <Route path="/review" element={<ReviewQueuePage />} />
-        {/* CourseRail (the actual picker) isn't built yet — land straight on
-            the one real lecture we have until it exists. */}
-        <Route path="/" element={<Navigate to="/lecture/l01" replace />} />
+        {/* The real entry point — links into every page above rather than
+            skipping straight past them. */}
+        <Route path="/" element={<LandingPage />} />
       </Routes>
     </BrowserRouter>
   );
