@@ -1,0 +1,95 @@
+/* Course Factory design tokens.
+   Import once at app root. Never redefine these values inline.
+
+   The palette comes from the room the lectures were filmed in: a slate
+   blackboard, chalk dust, warm chalk yellow. Not from a dashboard template. */
+
+:root {
+  /* ---- surface ---- */
+  --slate:        #16211E;  /* deep board green-black; the stage */
+  --slate-raised: #1E2C28;  /* panels, cards */
+  --slate-line:   #2A3A35;  /* hairlines, dividers */
+
+  /* ---- text ---- */
+  --chalk:        #E9E5DA;  /* warm dusty white; primary */
+  --dust:         #8E948C;  /* muted grey-green; secondary */
+  --dust-faint:   #5C6560;  /* disabled, placeholder */
+
+  /* ---- signal ---- */
+  /* LOAD-BEARING, NOT DECORATIVE. --written marks content that came from the
+     board rather than the transcript. Using it anywhere else destroys its
+     meaning, which is the product's clearest differentiator. */
+  --written:      #E0B84C;
+  --written-dim:  #6B5828;
+
+  /* Navigation, prerequisite edges, "go back to lecture 2" */
+  --path:         #6BA8B8;
+  --path-dim:     #2E4A52;
+
+  --error:        #C97064;
+  --ok:           #7FA86F;
+
+  /* ---- type ----
+     Display: characterful grotesque, used with restraint (lecture titles,
+              section heads). Body: neutral humanist sans.
+     Mono on every timestamp is FUNCTIONAL, not stylistic — timestamps get
+     compared constantly and proportional digits jitter. */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body:    'Inter', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  --step--1: 0.833rem;
+  --step-0:  1rem;
+  --step-1:  1.25rem;
+  --step-2:  1.6rem;
+  --step-3:  2.1rem;
+
+  /* ---- space ---- */
+  --s-1: 0.25rem;  --s-2: 0.5rem;  --s-3: 0.75rem;
+  --s-4: 1rem;     --s-5: 1.5rem;  --s-6: 2.5rem;
+
+  --radius:   4px;
+  --radius-lg: 8px;
+
+  /* ---- motion ----
+     One orchestrated moment only: the remediation transition. Everywhere
+     else, restraint. Scattered animation is what makes UI feel generated. */
+  --ease:            cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast:        120ms;
+  --dur-remediation: 640ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-remediation: 0ms; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* The one orchestrated motion moment (RemediationCard, R3) — everything
+   else in the app uses plain transitions. Covered by the
+   prefers-reduced-motion override above like any other animation. */
+@keyframes remediation-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Timestamps are compared, not read. Always mono, always tabular. */
+.ts {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--step--1);
+  color: var(--dust);
+}
+
+/* Applied to any content sourced from the board rather than the transcript. */
+.written {
+  color: var(--written);
+  border-bottom: 1px dashed var(--written-dim);
+}
+
+:focus-visible {
+  outline: 2px solid var(--path);
+  outline-offset: 2px;
+}

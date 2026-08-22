@@ -1,0 +1,7 @@
+httpx==0.28.1
+psycopg2-binary==2.9.12
+python-dotenv==1.0.1
+Pillow==12.3.0
+pytesseract==0.3.13
+mcp==2.0.0
+starlette<0.42.0,>=0.40.0

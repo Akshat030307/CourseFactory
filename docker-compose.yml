@@ -1,0 +1,35 @@
+# Local dev only. No production deployment, no reverse proxy, no resource limits.
+# Gateway and SPA run on the host with hot reload — faster than rebuilding containers.
+#
+# RocketRide's engine is NOT started from here, and doesn't need to be: the RocketRide
+# VS Code extension already runs its own native local engine at localhost:5565
+# (C:\Users\<user>\AppData\Local\RocketRide\engine\engine.exe), independent of this repo.
+# Confirmed running during F1 — see CLAUDE.md's "Verified" section. Self-hosting it via
+# Docker/build-from-source is possible but unnecessary; don't do it.
+
+services:
+  postgres:
+    # apache/age doesn't ship pgvector (confirmed in F2) — db/Dockerfile layers it on.
+    build: ./db
+    environment:
+      POSTGRES_USER: coursefactory
+      POSTGRES_PASSWORD: coursefactory
+      POSTGRES_DB: coursefactory
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    # 5432 is taken by another project already running on this machine
+    # (mesh-postgres-1) — mapped to 5433 on the host instead.
+    ports: ["5433:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coursefactory"]
+      interval: 5s
+      retries: 10
+
+  # Free TTS with no model download and no torch install.
+  edge-tts:
+    build: ./services/edge-tts
+    ports: ["5002:5002"]
+
+volumes:
+  pgdata:
