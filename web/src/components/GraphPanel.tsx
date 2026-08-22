@@ -94,8 +94,8 @@ export function GraphPanel() {
         {truncated && ` Showing first ${MAX_VISIBLE_NODES} nodes.`}
       </p>
       <p className="text-[var(--step--1)] text-[var(--dust)]">
-        Node color: <span style={{ color: masteryColor(0, '#8E948C') }}>struggling</span> →{' '}
-        <span style={{ color: masteryColor(1, '#8E948C') }}>mastered</span>, gray = not yet attempted.
+        Node color: <span style={{ color: masteryColor(0, '#9C9280') }}>struggling</span> →{' '}
+        <span style={{ color: masteryColor(1, '#9C9280') }}>mastered</span>, gray = not yet attempted.
       </p>
       <div ref={containerRef} className="min-h-[280px] flex-1 overflow-hidden rounded-[var(--radius)] border border-[var(--slate-line)]">
         <ForceGraph2D
@@ -108,13 +108,13 @@ export function GraphPanel() {
           nodeColor={(n) => {
             const node = n as VizNode;
             return node.kind === 'cluster'
-              ? masteryColor(node.avgMastery, '#6BA8B8')
-              : masteryColor(node.mastery, '#8E948C');
+              ? masteryColor(node.avgMastery, '#9C9280')
+              : masteryColor(node.mastery, '#9C9280');
           }}
-          linkColor={() => 'rgba(107, 168, 184, 0.55)'}
+          linkColor={() => 'rgba(224, 184, 76, 0.45)'}
           linkDirectionalArrowLength={4}
           linkDirectionalArrowRelPos={1}
-          backgroundColor="#1E2C28"
+          backgroundColor="#0D0D0D"
           onNodeClick={(n) => onNodeClick(n as VizNode)}
         />
       </div>

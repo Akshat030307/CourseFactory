@@ -1,40 +1,48 @@
 /* Course Factory design tokens.
    Import once at app root. Never redefine these values inline.
 
-   The palette comes from the room the lectures were filmed in: a slate
-   blackboard, chalk dust, warm chalk yellow. Not from a dashboard template. */
+   Black-and-gold SaaS palette (Stage 12) — deliberately unified with the
+   landing page rather than kept separate, per direct product instruction.
+   This does mean --written's color is no longer exclusive to board-only
+   content (it's the whole app's brand accent now) — the dashed underline
+   in the .written class below is what still actually marks board-only
+   content unambiguously; the color alone was never sufficient for that on
+   its own (colorblind accessibility, among other reasons), so the real
+   signal survives even though the strict "gold means only this" rule from
+   the original palette note no longer holds. */
 
 :root {
   /* ---- surface ---- */
-  --slate:        #16211E;  /* deep board green-black; the stage */
-  --slate-raised: #1E2C28;  /* panels, cards */
-  --slate-line:   #2A3A35;  /* hairlines, dividers */
+  --slate:        #000000;  /* page background */
+  --slate-raised: #0D0D0D;  /* panels, cards */
+  --slate-line:   #2A2410;  /* hairlines, dividers — warm, not neutral gray */
 
   /* ---- text ---- */
-  --chalk:        #E9E5DA;  /* warm dusty white; primary */
-  --dust:         #8E948C;  /* muted grey-green; secondary */
-  --dust-faint:   #5C6560;  /* disabled, placeholder */
+  --chalk:        #F2EFE6;  /* warm off-white; primary */
+  --dust:         #9C9280;  /* muted warm gray; secondary */
+  --dust-faint:   #55503F;  /* disabled, placeholder */
 
   /* ---- signal ---- */
-  /* LOAD-BEARING, NOT DECORATIVE. --written marks content that came from the
-     board rather than the transcript. Using it anywhere else destroys its
-     meaning, which is the product's clearest differentiator. */
+  /* Board-only content marker AND the app's general brand/accent gold —
+     see the note above. */
   --written:      #E0B84C;
   --written-dim:  #6B5828;
 
-  /* Navigation, prerequisite edges, "go back to lecture 2" */
-  --path:         #6BA8B8;
-  --path-dim:     #2E4A52;
+  /* Navigation, prerequisite edges, "go back to lecture 2" — unified with
+     --written rather than kept as a separate teal, per the same
+     black-and-gold-everywhere instruction. */
+  --path:         #E0B84C;
+  --path-dim:     #3A2E10;
 
   --error:        #C97064;
   --ok:           #7FA86F;
 
   /* ---- type ----
-     Display: characterful grotesque, used with restraint (lecture titles,
-              section heads). Body: neutral humanist sans.
-     Mono on every timestamp is FUNCTIONAL, not stylistic — timestamps get
-     compared constantly and proportional digits jitter. */
-  --font-display: 'Space Grotesk', system-ui, sans-serif;
+     One face everywhere (Inter) rather than a separate display face —
+     plainer, more uniform "SaaS product" feel than the old two-typeface
+     system. Mono on every timestamp is still FUNCTIONAL, not stylistic —
+     timestamps get compared constantly and proportional digits jitter. */
+  --font-display: 'Inter', system-ui, sans-serif;
   --font-body:    'Inter', system-ui, sans-serif;
   --font-mono:    'JetBrains Mono', ui-monospace, monospace;
 

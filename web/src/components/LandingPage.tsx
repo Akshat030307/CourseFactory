@@ -2,16 +2,15 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLectures } from '../api/lectures';
 
-// Local palette — deliberately not tokens.css's --written. That token is
-// LOAD-BEARING elsewhere (CLAUDE.md: marks board-only content, "using it
-// anywhere else destroys its meaning") — this page reuses the same gold
-// value as a literal, but scoped to this file only, not the shared tokens.
-const GOLD = '#E0B84C';
-const GOLD_DIM = '#8A7530';
-const CREAM = '#F0E6C8';
-const BLACK = '#000000';
-const PANEL = '#0D0D0D';
-const LINE = '#2A2410';
+// Stage 12: the whole app now shares this black-and-gold palette (was
+// scoped to just this page before) — these read the real tokens.css
+// values instead of duplicating them, so there's one source of truth.
+const GOLD = 'var(--written)';
+const GOLD_DIM = 'var(--written-dim)';
+const CREAM = 'var(--chalk)';
+const BLACK = 'var(--slate)';
+const PANEL = 'var(--slate-raised)';
+const LINE = 'var(--slate-line)';
 
 // Scroll-reveal: fades/slides a section in once it enters the viewport.
 // Plain IntersectionObserver, no animation library — consistent with how
