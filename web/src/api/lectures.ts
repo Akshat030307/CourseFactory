@@ -31,21 +31,30 @@ export function useCourses() {
   });
 }
 
-async function fetchLectures(studentId?: string): Promise<Lecture[]> {
-  const qs = studentId ? `?student_id=${encodeURIComponent(studentId)}` : '';
-  const res = await apiFetch(`/api/v1/lectures${qs}`);
+async function fetchLectures(courseId?: string, studentId?: string): Promise<Lecture[]> {
+  const params = new URLSearchParams();
+  if (courseId) params.set('course_id', courseId);
+  if (studentId) params.set('student_id', studentId);
+  const qs = params.toString();
+  const res = await apiFetch(`/api/v1/lectures${qs ? `?${qs}` : ''}`);
   if (!res.ok) throw new Error(`Failed to fetch lectures: ${res.status}`);
   return res.json();
 }
 
-// studentId is optional — callers that only need lecture id/title/video_url
-// (not the per-student `mastery` field) can omit it and get the server's
-// default. Included in the query key so switching students (the instructor
-// switcher) actually refetches instead of serving a stale student's cache.
-export function useLectures(studentId?: string) {
+// Options object, not two positional strings — a positional courseId/
+// studentId pair is exactly the shape that silently swapped slots once
+// already (GraphPanel.tsx used to call useLectures(studentId) alone before
+// courseId existed; adding a new leading positional param here would have
+// broken that call without a type error). Both are optional — callers that
+// only need lecture id/title/video_url can omit either and get the
+// server's default. Both are in the query key so switching course or
+// student (the course/instructor switchers) actually refetches instead of
+// serving a stale selection's cache.
+export function useLectures(opts: { courseId?: string; studentId?: string } = {}) {
+  const { courseId, studentId } = opts;
   return useQuery({
-    queryKey: ['lectures', studentId ?? null],
-    queryFn: () => fetchLectures(studentId),
+    queryKey: ['lectures', courseId ?? null, studentId ?? null],
+    queryFn: () => fetchLectures(courseId, studentId),
     staleTime: Infinity,
   });
 }

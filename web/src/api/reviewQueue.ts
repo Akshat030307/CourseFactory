@@ -24,10 +24,14 @@ async function fetchReviewQueue(courseId: string): Promise<ReviewItem[]> {
   return res.json();
 }
 
-export function useReviewQueue(courseId: string) {
+// courseId is undefined until ReviewQueuePage's own course picker has a
+// selection (defaults to the first course once useCourses() resolves) —
+// `enabled` avoids firing a `course_id=undefined`-shaped request meanwhile.
+export function useReviewQueue(courseId: string | undefined) {
   return useQuery({
-    queryKey: ['review-queue', courseId],
-    queryFn: () => fetchReviewQueue(courseId),
+    queryKey: ['review-queue', courseId ?? null],
+    queryFn: () => fetchReviewQueue(courseId!),
+    enabled: !!courseId,
   });
 }
 

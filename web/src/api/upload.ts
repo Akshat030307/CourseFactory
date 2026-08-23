@@ -46,3 +46,44 @@ export function useUploadLecture() {
     },
   });
 }
+
+export interface YoutubeUploadArgs {
+  url: string;
+  title: string;
+  courseId: string | null;
+  newCourseTitle: string | null;
+}
+
+async function uploadFromYoutube(args: YoutubeUploadArgs): Promise<UploadResponse> {
+  const res = await apiFetch('/api/v1/upload/youtube', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      url: args.url,
+      title: args.title,
+      course_id: args.courseId,
+      new_course_title: args.newCourseTitle,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.title ?? body?.detail ?? `Upload failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+// Same fast-return shape as useUploadLecture: the response comes back as
+// soon as the course/lecture rows exist and the download+ingest subprocess
+// is spawned — it does not wait for the download itself to finish.
+export function useUploadFromYoutube() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: uploadFromYoutube,
+    onSuccess: () => {
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['lectures'] }),
+        queryClient.invalidateQueries({ queryKey: ['courses'] }),
+      ]);
+    },
+  });
+}

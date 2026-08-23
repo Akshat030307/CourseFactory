@@ -3,17 +3,13 @@ import { type Lane, useSearch } from '../api/search';
 import { navigate } from '../nav/navigate';
 import { useSearchHighlights } from '../search/searchHighlights';
 
-// Single demo course fixture (MIT 18.06) — matches scripts/ingest.py's
-// default. A real course picker is CourseRail's job, not built yet.
-const COURSE_ID = '18.06';
-
 const LANES: { value: Lane; label: string }[] = [
   { value: 'both', label: 'Both' },
   { value: 'spoken', label: 'Spoken' },
   { value: 'written', label: 'Written' },
 ];
 
-export function SearchPanel() {
+export function SearchPanel({ courseId }: { courseId?: string }) {
   const [query, setQuery] = useState('');
   const [lane, setLane] = useState<Lane>('both');
   const search = useSearch();
@@ -39,9 +35,9 @@ export function SearchPanel() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!query.trim()) return;
+    if (!query.trim() || !courseId) return;
     search.mutate(
-      { query, lane, courseId: COURSE_ID },
+      { query, lane, courseId },
       {
         onSuccess: (data) => {
           const boardFrameIds = data.results.filter((r) => r.source === 'board' && r.frame_id).map((r) => r.frame_id!);

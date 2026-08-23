@@ -18,4 +18,5 @@ SELECT
         WHERE c.introduced_in = l.id
     ) AS mastery
 FROM lectures l
+WHERE ($2::text IS NULL OR l.course_id = $2)
 ORDER BY l.course_id, l.sequence;

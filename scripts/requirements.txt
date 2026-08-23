@@ -18,3 +18,8 @@ python-telegram-bot==22.8
 # (generated content) — this is about the *script* being runnable in the
 # built image, not about baking the PNG in.
 qrcode==8.2
+# scripts/ingest.py — YouTube-URL ingestion (Stage 16). Used as a Python
+# library (yt_dlp.YoutubeDL), not the CLI shim — needs ffmpeg on PATH to
+# merge separate video/audio streams, which ingest.py already requires
+# unconditionally for its own ffmpeg/ffprobe subprocess calls.
+yt-dlp==2026.8.19

@@ -5,12 +5,11 @@ import { useActiveContradiction } from '../contradictions/activeContradiction';
 import { seekTo } from '../player/playerControls';
 import { usePlayerTime } from '../player/usePlayerTime';
 
-// Matches SearchPanel/GraphPanel's fixture-course constant.
-const COURSE_ID = '18.06';
 const CLAIM_MATCH_WINDOW_MS = 5000;
 
 interface TranscriptLaneProps {
   lectureId: string;
+  courseId?: string;
 }
 
 function findActiveId(ms: number, segments: Segment[]): string | null {
@@ -22,9 +21,9 @@ function findActiveId(ms: number, segments: Segment[]): string | null {
   return active;
 }
 
-export function TranscriptLane({ lectureId }: TranscriptLaneProps) {
+export function TranscriptLane({ lectureId, courseId }: TranscriptLaneProps) {
   const { data: segments, isLoading, error } = useSegments(lectureId);
-  const { data: contradictions } = useContradictions(COURSE_ID);
+  const { data: contradictions } = useContradictions(courseId);
   const setActiveContradiction = useActiveContradiction((s) => s.setActive);
   const [activeId, setActiveId] = useState<string | null>(null);
   const activeRef = useRef<HTMLButtonElement>(null);

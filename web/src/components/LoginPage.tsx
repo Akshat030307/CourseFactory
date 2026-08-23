@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLogin } from '../api/auth';
+import { apiFetch } from '../api/http';
+import type { Course } from '../api/lectures';
 
 export function LoginPage() {
   const [username, setUsername] = useState('');
@@ -8,9 +10,27 @@ export function LoginPage() {
   const login = useLogin();
   const navigate = useNavigate();
 
+  async function onLoginSuccess() {
+    // Not useCourses() — this fires the instant login resolves, before any
+    // hook value tied to the new session could already be fresh. A plain
+    // one-off fetch here, same session cookie apiFetch already attaches.
+    let firstCourseId = '18.06';
+    try {
+      const res = await apiFetch('/api/v1/courses');
+      if (res.ok) {
+        const courses: Course[] = await res.json();
+        firstCourseId = courses[0]?.id ?? firstCourseId;
+      }
+    } catch {
+      // Fall through to the '18.06' fallback — a broken course fetch here
+      // shouldn't block landing somewhere reasonable after a real login.
+    }
+    navigate(`/course/${firstCourseId}`);
+  }
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    login.mutate({ username, password }, { onSuccess: () => navigate('/course/18.06') });
+    login.mutate({ username, password }, { onSuccess: onLoginSuccess });
   }
 
   return (

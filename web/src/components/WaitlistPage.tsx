@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useLectures } from '../api/lectures';
 import { type CreatedAccount, useCreateAccount, useWaitlist } from '../api/waitlist';
 import { LogoutButton } from './AppShell';
 
@@ -17,6 +18,8 @@ export function WaitlistPage() {
   const { data: items, isPending, isError } = useWaitlist();
   const createAccount = useCreateAccount();
   const [justCreated, setJustCreated] = useState<CreatedAccount | null>(null);
+  const { data: lectures } = useLectures();
+  const firstLecture = lectures?.[0]?.id ?? 'l01';
 
   const pending = (items ?? []).filter((i) => !i.invited);
   const invited = (items ?? []).filter((i) => i.invited);
@@ -26,7 +29,7 @@ export function WaitlistPage() {
       <div className="flex items-center justify-between">
         <h1 className="font-[var(--font-display)] text-[var(--step-2)] text-[var(--chalk)]">Waitlist</h1>
         <div className="flex items-center gap-[var(--s-3)]">
-          <Link to="/lecture/l01" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
+          <Link to={`/lecture/${firstLecture}`} className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
             Back to course
           </Link>
           <LogoutButton />

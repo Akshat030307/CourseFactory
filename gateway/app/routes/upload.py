@@ -2,6 +2,7 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
@@ -42,10 +43,27 @@ def slugify(text: str) -> str:
 
 @router.get("/courses")
 async def list_courses(request: Request) -> list[Course]:
-    require_instructor(request.state.identity)
+    # Deliberately NOT require_instructor (unlike /upload, /review-queue,
+    # /waitlist) — this reverses that Stage 15 default on purpose, not an
+    # oversight. GET /lectures already has zero per-student content
+    # restriction (every student sees every lecture today), so a course
+    # switcher usable by student sessions needs the course list too;
+    # extending that same "role-gated, not enrollment-gated" openness from
+    # lectures to courses doesn't open a new hole.
     async with request.app.state.pool.acquire() as conn:
         rows = await conn.fetch(load("courses.sql"))
     return [Course(**dict(row)) for row in rows]
+
+
+async def _resolve_course(conn, course_id: str | None, new_course_title: str | None) -> tuple[str, int]:
+    """Shared by /upload and /upload/youtube: upsert the course (a no-op if
+    course_id names an existing one), then claim the next free sequence
+    slot for it. Returns (resolved_course_id, next_sequence)."""
+    resolved_course_id = course_id or f"c_{slugify(new_course_title)}"
+    resolved_course_title = new_course_title if new_course_title else course_id
+    await conn.execute(load("upsert_course.sql"), resolved_course_id, resolved_course_title)
+    next_seq = await conn.fetchval(load("next_sequence.sql"), resolved_course_id)
+    return resolved_course_id, next_seq
 
 
 @router.post("/upload")
@@ -70,9 +88,6 @@ async def upload_lecture(
             f"Upload {' or '.join(sorted(ALLOWED_EXTENSIONS))} — convert with ffmpeg first if needed.",
         )
 
-    resolved_course_id = course_id or f"c_{slugify(new_course_title)}"
-    resolved_course_title = new_course_title if new_course_title else course_id
-
     lecture_id = f"l_{uuid.uuid4().hex[:10]}"
     dest = LECTURES_DIR / f"{lecture_id}{ext}"
     LECTURES_DIR.mkdir(parents=True, exist_ok=True)
@@ -91,8 +106,7 @@ async def upload_lecture(
         raise HTTPException(400, "Empty file.")
 
     async with request.app.state.pool.acquire() as conn:
-        await conn.execute(load("upsert_course.sql"), resolved_course_id, resolved_course_title)
-        next_seq = await conn.fetchval(load("next_sequence.sql"), resolved_course_id)
+        resolved_course_id, next_seq = await _resolve_course(conn, course_id, new_course_title)
         await conn.execute(
             load("insert_lecture.sql"), lecture_id, resolved_course_id, title, next_seq, dest.name
         )
@@ -111,6 +125,57 @@ async def upload_lecture(
             "--lecture-id", lecture_id,
             "--course-id", resolved_course_id,
             "--title", title,
+            "--sequence", str(next_seq),
+        ],
+        cwd=REPO_ROOT,
+    )
+
+    return UploadResponse(lecture_id=lecture_id, course_id=resolved_course_id)
+
+
+class YoutubeUploadRequest(BaseModel):
+    url: str
+    title: str
+    course_id: str | None = None
+    new_course_title: str | None = None
+
+
+YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}
+
+
+@router.post("/upload/youtube")
+async def upload_from_youtube(request: Request, body: YoutubeUploadRequest) -> UploadResponse:
+    require_instructor(request.state.identity)
+    if not body.title.strip():
+        raise HTTPException(400, "Title is required.")
+    if not body.course_id and not body.new_course_title:
+        raise HTTPException(400, "Pick a course or name a new one.")
+
+    host = urlparse(body.url).netloc.lower()
+    if host not in YOUTUBE_HOSTS:
+        raise HTTPException(400, "That doesn't look like a YouTube URL.")
+
+    lecture_id = f"l_{uuid.uuid4().hex[:10]}"
+
+    async with request.app.state.pool.acquire() as conn:
+        resolved_course_id, next_seq = await _resolve_course(conn, body.course_id, body.new_course_title)
+        # source_path stays NULL — no local file exists yet. scripts/ingest.py
+        # downloads it; lectures.sql's own video_url fallback
+        # (COALESCE(NULLIF(source_path,''), id || '.mp4')) resolves correctly
+        # the instant the download writes to that exact conventional path, so
+        # nothing here needs to come back and set source_path later.
+        await conn.execute(
+            load("insert_lecture.sql"), lecture_id, resolved_course_id, body.title, next_seq, None
+        )
+
+    subprocess.Popen(
+        [
+            sys.executable,
+            str(INGEST_SCRIPT),
+            "--youtube-url", body.url,
+            "--lecture-id", lecture_id,
+            "--course-id", resolved_course_id,
+            "--title", body.title,
             "--sequence", str(next_seq),
         ],
         cwd=REPO_ROOT,

@@ -13,7 +13,7 @@ import { TracePanel } from './TracePanel';
 import { TranscriptLane } from './TranscriptLane';
 import { VideoPlayer } from './VideoPlayer';
 import { useLogout, useMe } from '../api/auth';
-import { useLectures } from '../api/lectures';
+import { useCourses, useLectures } from '../api/lectures';
 import { useStudents } from '../api/students';
 import { useActiveContradiction } from '../contradictions/activeContradiction';
 import { useNavStack } from '../nav/navStack';
@@ -37,6 +37,13 @@ export function AppShell({ view }: AppShellProps) {
   const { data: me } = useMe();
   const { data: lectures } = useLectures();
   const currentLecture = lectures?.find((l) => l.id === id);
+  // /course/:id's own :id IS a course id directly; /lecture/:id's :id is a
+  // lecture id, so its course has to come from that lecture's own row once
+  // the (unfiltered) list above resolves — undefined until then, which is
+  // exactly why GraphPanel/SearchPanel/ContradictionsPanel/TranscriptLane
+  // all need to tolerate courseId being momentarily undefined on first
+  // paint (see their own `enabled: !!courseId` guards).
+  const courseId = view === 'course' ? id : currentLecture?.course_id;
   const [courseCollapsed, setCourseCollapsed] = useState(false);
   const [quizOpen, setQuizOpen] = useState(false);
 
@@ -125,7 +132,7 @@ export function AppShell({ view }: AppShellProps) {
           </button>
         }
       >
-        {!courseCollapsed && <CourseRail activeLectureId={view === 'lecture' ? id : undefined} />}
+        {!courseCollapsed && <CourseRail courseId={courseId} activeLectureId={view === 'lecture' ? id : undefined} />}
         {/* Quiz lives next to course navigation, not buried at the bottom
             of a long read-only Inspector column — but as a launcher button
             rather than an always-open panel, so it doesn't compete for
@@ -157,7 +164,7 @@ export function AppShell({ view }: AppShellProps) {
                 md:max-h-none restores the desktop behavior, where flex-1
                 already correctly fills the bounded column. */}
             <div className="min-h-0 max-h-[60vh] flex-1 overflow-y-auto md:max-h-none">
-              <TranscriptLane lectureId={id} />
+              <TranscriptLane lectureId={id} courseId={courseId} />
             </div>
           </div>
         ) : view === 'lecture' && id && lectures ? (
@@ -170,14 +177,14 @@ export function AppShell({ view }: AppShellProps) {
       </Column>
 
       <Column title="Inspector" className="order-2 border-t border-[var(--slate-line)] md:order-none md:border-t-0 md:border-l">
-        <SearchPanel />
+        <SearchPanel courseId={courseId} />
         <div className="mt-[var(--s-5)] flex flex-col gap-[var(--s-2)]">
           <h3 className="text-[var(--step--1)] uppercase tracking-wide text-[var(--dust)]">Concept graph</h3>
-          <GraphPanel />
+          <GraphPanel courseId={courseId} />
         </div>
         <div className="mt-[var(--s-5)] flex flex-col gap-[var(--s-2)]">
           <h3 className="text-[var(--step--1)] uppercase tracking-wide text-[var(--dust)]">Contradictions</h3>
-          <ContradictionsPanel />
+          <ContradictionsPanel courseId={courseId} />
         </div>
         <div className="mt-[var(--s-5)] flex flex-col gap-[var(--s-2)]">
           <h3 className="text-[var(--step--1)] uppercase tracking-wide text-[var(--dust)]">Trace</h3>
@@ -293,32 +300,70 @@ function Column({
 // student at a control that doesn't exist is worse than no message at all.
 // Minimal real content, not the full Stage 1 rail spec (mastery dots,
 // upload) — just enough for "select a lecture" to actually be true.
-function CourseRail({ activeLectureId }: { activeLectureId?: string }) {
-  const { data: lectures, isPending, isError } = useLectures();
-
-  if (isPending) return <p className="text-[var(--dust)]">Loading lectures…</p>;
-  if (isError) return <p className="text-[var(--error)]">Couldn't load lectures. Try reloading.</p>;
-  if (!lectures?.length) return <p className="text-[var(--dust)]">No lectures ingested yet — run scripts/ingest.py.</p>;
+//
+// Stage 16: courseId scopes the list — without it, a second course's
+// lectures would interleave with the first's (their `sequence` numbers are
+// only unique *within* a course, so a course-blind sort can't tell them
+// apart). The switcher above the list is the only way to get from one
+// course to another anywhere in the app shell.
+function CourseRail({ courseId, activeLectureId }: { courseId?: string; activeLectureId?: string }) {
+  const { data: lectures, isPending, isError } = useLectures({ courseId });
 
   return (
-    <ul className="mt-[var(--s-2)] flex flex-col gap-[var(--s-1)]">
-      {lectures
-        .slice()
-        .sort((a, b) => a.sequence - b.sequence)
-        .map((l) => (
-          <li key={l.id}>
-            <Link
-              to={`/lecture/${l.id}`}
-              className={`block rounded-[var(--radius)] px-[var(--s-2)] py-[var(--s-1)] text-[var(--step--1)] ${
-                l.id === activeLectureId
-                  ? 'bg-[var(--path-dim)] text-[var(--chalk)]'
-                  : 'text-[var(--dust)] hover:bg-[var(--slate-line)] hover:text-[var(--chalk)]'
-              }`}
-            >
-              {l.title}
-            </Link>
-          </li>
-        ))}
-    </ul>
+    <>
+      <CourseSwitcher courseId={courseId} />
+      {isPending ? (
+        <p className="mt-[var(--s-2)] text-[var(--dust)]">Loading lectures…</p>
+      ) : isError ? (
+        <p className="mt-[var(--s-2)] text-[var(--error)]">Couldn't load lectures. Try reloading.</p>
+      ) : !lectures?.length ? (
+        <p className="mt-[var(--s-2)] text-[var(--dust)]">No lectures ingested yet — run scripts/ingest.py.</p>
+      ) : (
+        <ul className="mt-[var(--s-2)] flex flex-col gap-[var(--s-1)]">
+          {lectures
+            .slice()
+            .sort((a, b) => a.sequence - b.sequence)
+            .map((l) => (
+              <li key={l.id}>
+                <Link
+                  to={`/lecture/${l.id}`}
+                  className={`block rounded-[var(--radius)] px-[var(--s-2)] py-[var(--s-1)] text-[var(--step--1)] ${
+                    l.id === activeLectureId
+                      ? 'bg-[var(--path-dim)] text-[var(--chalk)]'
+                      : 'text-[var(--dust)] hover:bg-[var(--slate-line)] hover:text-[var(--chalk)]'
+                  }`}
+                >
+                  {l.title}
+                </Link>
+              </li>
+            ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+// A plain native <select> — same pattern as StudentSwitcher above, this
+// codebase's established way of doing a switcher without a dropdown
+// component library. Navigates to /course/:id, which is what finally makes
+// that route do something (previously totally inert).
+function CourseSwitcher({ courseId }: { courseId?: string }) {
+  const { data: courses } = useCourses();
+  const navigate = useNavigate();
+
+  if (!courses || courses.length < 2) return null;
+
+  return (
+    <select
+      value={courseId ?? ''}
+      onChange={(e) => e.target.value && navigate(`/course/${e.target.value}`)}
+      className="w-full rounded-[var(--radius)] border border-[var(--slate-line)] bg-[var(--slate)] px-[var(--s-2)] py-[var(--s-1)] text-[var(--step--1)] text-[var(--chalk)]"
+    >
+      {courses.map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.title}
+        </option>
+      ))}
+    </select>
   );
 }

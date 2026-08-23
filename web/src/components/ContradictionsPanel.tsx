@@ -1,10 +1,8 @@
 import { useContradictions } from '../api/contradictions';
 import { useActiveContradiction } from '../contradictions/activeContradiction';
 
-const COURSE_ID = '18.06';
-
-export function ContradictionsPanel() {
-  const { data: contradictions, isPending, isError } = useContradictions(COURSE_ID);
+export function ContradictionsPanel({ courseId }: { courseId?: string }) {
+  const { data: contradictions, isPending, isError } = useContradictions(courseId);
   const setActive = useActiveContradiction((s) => s.setActive);
 
   if (isPending) return <p className="text-[var(--dust)]">Loading…</p>;

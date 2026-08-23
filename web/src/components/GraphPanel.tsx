@@ -5,9 +5,6 @@ import { useLectures } from '../api/lectures';
 import { navigate } from '../nav/navigate';
 import { useEffectiveStudentId } from '../students/useEffectiveStudentId';
 
-// Single demo course fixture — matches SearchPanel's COURSE_ID.
-const COURSE_ID = '18.06';
-
 // CLAUDE.md: "200+ force-directed nodes is a slideshow... cap visible at
 // ~60." Can't be exercised with real data at fixture scale (13 concepts,
 // 4 lectures) — kept as a real slice rather than decoration, same spirit as
@@ -41,10 +38,10 @@ function masteryColor(mastery: number | null, fallback: string): string {
   return `rgb(${rgb.join(',')})`;
 }
 
-export function GraphPanel() {
+export function GraphPanel({ courseId }: { courseId?: string }) {
   const studentId = useEffectiveStudentId();
-  const { data: graph, isPending, isError } = useGraph(COURSE_ID, studentId);
-  const { data: lectures } = useLectures(studentId);
+  const { data: graph, isPending, isError } = useGraph(courseId, studentId);
+  const { data: lectures } = useLectures({ courseId, studentId });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 320, height: 360 });

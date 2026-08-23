@@ -1,11 +1,8 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useCourses, useLectures } from '../api/lectures';
 import { useApproveByConcept, useApproveQuestion, useRejectQuestion, useReviewQueue, type ReviewItem } from '../api/reviewQueue';
 import { LogoutButton } from './AppShell';
-
-// X4 (Stage 9): instructor-facing, not student-facing — CLAUDE.md: "one
-// hardcoded student, one instructor," no auth to gate this behind, so it's
-// just its own route rather than folded into AppShell's student view.
-const COURSE_ID = '18.06';
 
 function formatTimestamp(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -13,7 +10,13 @@ function formatTimestamp(ms: number): string {
 }
 
 export function ReviewQueuePage() {
-  const { data: items, isPending, isError } = useReviewQueue(COURSE_ID);
+  const { data: courses } = useCourses();
+  const { data: lectures } = useLectures();
+  const firstLecture = lectures?.[0]?.id ?? 'l01';
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const courseId = selectedCourseId ?? courses?.[0]?.id;
+
+  const { data: items, isPending, isError } = useReviewQueue(courseId);
   const approveQuestion = useApproveQuestion();
   const rejectQuestion = useRejectQuestion();
   const approveByConcept = useApproveByConcept();
@@ -31,7 +34,20 @@ export function ReviewQueuePage() {
       <div className="flex items-center justify-between">
         <h1 className="font-[var(--font-display)] text-[var(--step-2)] text-[var(--chalk)]">Review queue</h1>
         <div className="flex items-center gap-[var(--s-3)]">
-          <Link to="/lecture/l01" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
+          {courses && courses.length > 1 && (
+            <select
+              value={courseId ?? ''}
+              onChange={(e) => setSelectedCourseId(e.target.value)}
+              className="rounded-[var(--radius)] border border-[var(--slate-line)] bg-[var(--slate)] px-[var(--s-2)] py-[var(--s-1)] text-[var(--step--1)] text-[var(--chalk)]"
+            >
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+            </select>
+          )}
+          <Link to={`/lecture/${firstLecture}`} className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
             Back to course
           </Link>
           <LogoutButton />

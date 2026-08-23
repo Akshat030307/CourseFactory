@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useMe } from '../api/auth';
+import { useCourses } from '../api/lectures';
 
 // Parallel to RequireAuth, not a prop on it — Upload/Review Queue/Waitlist
 // are instructor-only tools with no student-facing reason to exist (the
@@ -10,9 +11,11 @@ import { useMe } from '../api/auth';
 // than back to /login — they ARE authenticated, just not authorized here.
 export function RequireRole({ role, children }: { role: 'instructor' | 'student'; children: ReactNode }) {
   const { data, isPending } = useMe();
+  const { data: courses } = useCourses();
+  const firstCourseId = courses?.[0]?.id ?? '18.06';
 
   if (isPending) return null;
   if (!data?.authenticated) return <Navigate to="/login" replace />;
-  if (data.role !== role) return <Navigate to="/course/18.06" replace />;
+  if (data.role !== role) return <Navigate to={`/course/${firstCourseId}`} replace />;
   return <>{children}</>;
 }

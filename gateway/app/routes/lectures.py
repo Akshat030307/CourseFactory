@@ -43,10 +43,10 @@ class Track(BaseModel):
 
 
 @router.get("/lectures")
-async def list_lectures(request: Request, student_id: str | None = None) -> list[Lecture]:
+async def list_lectures(request: Request, student_id: str | None = None, course_id: str | None = None) -> list[Lecture]:
     effective_student_id = resolve_student_id(request.state.identity, student_id)
     async with request.app.state.pool.acquire() as conn:
-        rows = await conn.fetch(load("lectures.sql"), effective_student_id)
+        rows = await conn.fetch(load("lectures.sql"), effective_student_id, course_id)
     return [Lecture(**dict(row)) for row in rows]
 
 

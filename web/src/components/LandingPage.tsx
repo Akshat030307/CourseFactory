@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMe } from '../api/auth';
-import { useLectures } from '../api/lectures';
+import { useCourses, useLectures } from '../api/lectures';
 
 // Stage 12: the whole app now shares this black-and-gold palette (was
 // scoped to just this page before) — these read the real tokens.css
@@ -81,6 +81,8 @@ function Divider() {
 export function LandingPage() {
   const { data: lectures } = useLectures();
   const firstLecture = lectures?.[0]?.id ?? 'l01';
+  const { data: courses } = useCourses();
+  const firstCourseId = courses?.[0]?.id ?? '18.06';
   // Stage 14: still invite-only (no self-service signup — see
   // CLAUDE.md), so an anonymous visitor clicking straight into
   // /course/18.06 or /upload just bounces off RequireAuth's redirect to
@@ -147,7 +149,7 @@ export function LandingPage() {
         }
       `}</style>
 
-      <Nav authenticated={authenticated} />
+      <Nav authenticated={authenticated} firstCourseId={firstCourseId} firstLecture={firstLecture} />
       <Hero firstLecture={firstLecture} authenticated={authenticated} />
       <Differentiators />
       <DemoMoments firstLecture={firstLecture} />
@@ -159,7 +161,15 @@ export function LandingPage() {
   );
 }
 
-function Nav({ authenticated }: { authenticated: boolean }) {
+function Nav({
+  authenticated,
+  firstCourseId,
+  firstLecture,
+}: {
+  authenticated: boolean;
+  firstCourseId: string;
+  firstLecture: string;
+}) {
   return (
     <header className="lp-nav flex items-center justify-between px-[var(--s-5)] py-[var(--s-3)]" style={{ borderBottom: `1px solid ${LINE}` }}>
       <Link to="/" className="font-[var(--font-display)] text-[var(--step-1)] tracking-tight" style={{ color: GOLD }}>
@@ -168,7 +178,7 @@ function Nav({ authenticated }: { authenticated: boolean }) {
       <nav className="flex items-center gap-[var(--s-4)] text-[var(--step--1)]">
         {authenticated ? (
           <>
-            <Link to="/course/18.06" className="lp-link" style={{ color: CREAM }}>
+            <Link to={`/course/${firstCourseId}`} className="lp-link" style={{ color: CREAM }}>
               Dashboard
             </Link>
             <Link to="/drill" className="lp-link" style={{ color: CREAM }}>
@@ -184,7 +194,7 @@ function Nav({ authenticated }: { authenticated: boolean }) {
               Waitlist
             </Link>
             <Link
-              to="/lecture/l01"
+              to={`/lecture/${firstLecture}`}
               className="lp-btn lp-btn-solid rounded-[var(--radius)] px-[var(--s-3)] py-[var(--s-1)] font-medium"
               style={{ background: GOLD, color: BLACK }}
             >
@@ -212,7 +222,7 @@ function Nav({ authenticated }: { authenticated: boolean }) {
 
 function Hero({ firstLecture, authenticated }: { firstLecture: string; authenticated: boolean }) {
   return (
-    <section className="relative mx-auto flex max-w-4xl flex-col items-start gap-[var(--s-5)] overflow-hidden px-[var(--s-5)] py-24 md:py-36">
+    <section className="relative mx-auto flex max-w-4xl flex-col items-start gap-[var(--s-5)] overflow-hidden px-[var(--s-5)] py-16 md:py-24">
       <div className="lp-hero-glow" />
       <span
         className="lp-hero-item relative z-10 flex items-center gap-[var(--s-2)] rounded-[var(--radius)] px-[var(--s-3)] py-[var(--s-1)] text-[var(--step--1)] tracking-[0.02em]"
@@ -316,10 +326,10 @@ function Differentiators() {
     },
   ];
   return (
-    <section className="relative px-[var(--s-5)] py-20 md:py-28">
+    <section className="relative px-[var(--s-5)] py-14 md:py-20">
       <Divider />
       <Reveal>
-        <h2 className="mb-[var(--s-6)] mt-[var(--s-6)] text-center font-[var(--font-display)] text-[var(--step-3)]" style={{ color: GOLD }}>
+        <h2 className="mb-[var(--s-5)] text-center font-[var(--font-display)] text-[var(--step-3)]" style={{ color: GOLD }}>
           What makes it different
         </h2>
       </Reveal>
@@ -376,10 +386,10 @@ function DemoMoments({ firstLecture }: { firstLecture: string }) {
     },
   ];
   return (
-    <section className="relative px-[var(--s-5)] py-20 md:py-28">
+    <section className="relative px-[var(--s-5)] py-14 md:py-20">
       <Divider />
       <Reveal>
-        <h2 className="mb-[var(--s-6)] mt-[var(--s-6)] text-center font-[var(--font-display)] text-[var(--step-3)]" style={{ color: GOLD }}>
+        <h2 className="mb-[var(--s-5)] text-center font-[var(--font-display)] text-[var(--step-3)]" style={{ color: GOLD }}>
           Four demo moments
         </h2>
       </Reveal>
@@ -430,10 +440,10 @@ function HowItWorks() {
     { n: 4, title: 'Diagnose & guide', body: 'Find gaps. Send students to the exact fix.' },
   ];
   return (
-    <section id="how-it-works" className="relative px-[var(--s-5)] py-20 md:py-28">
+    <section id="how-it-works" className="relative px-[var(--s-5)] py-14 md:py-20">
       <Divider />
       <Reveal>
-        <h2 className="mb-[var(--s-6)] mt-[var(--s-6)] text-center font-[var(--font-display)] text-[var(--step-3)]" style={{ color: GOLD }}>
+        <h2 className="mb-[var(--s-5)] text-center font-[var(--font-display)] text-[var(--step-3)]" style={{ color: GOLD }}>
           How it works
         </h2>
       </Reveal>
@@ -492,10 +502,10 @@ function Cost() {
     { label: 'Embeddings', value: '~$0.001 (OpenAI)' },
   ];
   return (
-    <section className="relative px-[var(--s-5)] py-20 md:py-28">
+    <section className="relative px-[var(--s-5)] py-14 md:py-20">
       <Divider />
       <Reveal>
-        <h2 className="mb-[var(--s-6)] mt-[var(--s-6)] text-center font-[var(--font-display)] text-[var(--step-3)]" style={{ color: CREAM }}>
+        <h2 className="mb-[var(--s-5)] text-center font-[var(--font-display)] text-[var(--step-3)]" style={{ color: CREAM }}>
           Costs <span style={{ color: GOLD }}>~1.5¢</span> per lecture
         </h2>
       </Reveal>
@@ -547,11 +557,11 @@ const CONFIG_LINES: { indent: number; parts: { text: string; kind?: 'key' | 'str
 
 function Distribution() {
   return (
-    <section id="distribution" className="relative overflow-hidden px-[var(--s-5)] py-20 md:py-28">
+    <section id="distribution" className="relative overflow-hidden px-[var(--s-5)] py-14 md:py-20">
       <Divider />
       <div className="lp-section-glow" />
       <Reveal>
-        <h2 className="relative mb-[var(--s-6)] mt-[var(--s-6)] text-center font-[var(--font-display)] text-[var(--step-3)]" style={{ color: GOLD }}>
+        <h2 className="relative mb-[var(--s-5)] text-center font-[var(--font-display)] text-[var(--step-3)]" style={{ color: GOLD }}>
           Turn any lecture into your smartest teacher
         </h2>
       </Reveal>
@@ -635,7 +645,7 @@ function Distribution() {
 
 function FooterCta({ firstLecture, authenticated }: { firstLecture: string; authenticated: boolean }) {
   return (
-    <footer className="relative px-[var(--s-5)] py-24 text-center md:py-36" style={{ borderTop: `1px solid ${LINE}` }}>
+    <footer className="relative px-[var(--s-5)] py-16 text-center md:py-24" style={{ borderTop: `1px solid ${LINE}` }}>
       <Reveal>
         <div className="flex flex-wrap justify-center gap-[var(--s-5)] text-[var(--step--1)]" style={{ color: CREAM, opacity: 0.55, fontFamily: MONO }}>
           <span>

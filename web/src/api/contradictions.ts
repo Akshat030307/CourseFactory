@@ -21,9 +21,13 @@ async function fetchContradictions(courseId: string): Promise<Contradiction[]> {
   return res.json();
 }
 
-export function useContradictions(courseId: string) {
+// courseId is derived (not a hardcoded constant), so it's undefined on
+// first paint until the lectures list resolves — `enabled` avoids firing a
+// `GET /courses/undefined/contradictions`-shaped request in that window.
+export function useContradictions(courseId: string | undefined) {
   return useQuery({
-    queryKey: ['contradictions', courseId],
-    queryFn: () => fetchContradictions(courseId),
+    queryKey: ['contradictions', courseId ?? null],
+    queryFn: () => fetchContradictions(courseId!),
+    enabled: !!courseId,
   });
 }

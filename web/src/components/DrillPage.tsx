@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useLectures } from '../api/lectures';
 import { useDueQuestions, useSubmitAttempt, type AttemptResult, type DueQuestion } from '../api/quiz';
 import { useEffectiveStudentId } from '../students/useEffectiveStudentId';
 import { LogoutButton } from './AppShell';
@@ -12,6 +13,8 @@ import { RemediationCard } from './RemediationCard';
 // AppShell's three-column layout.
 export function DrillPage() {
   const studentId = useEffectiveStudentId();
+  const { data: lectures } = useLectures();
+  const firstLecture = lectures?.[0]?.id ?? 'l01';
   const { data: due, isPending, isError } = useDueQuestions(studentId);
   const submitAttempt = useSubmitAttempt();
   const [current, setCurrent] = useState<DueQuestion | null>(null);
@@ -54,7 +57,7 @@ export function DrillPage() {
       <div className="flex items-center justify-between">
         <h1 className="font-[var(--font-display)] text-[var(--step-2)] text-[var(--chalk)]">Review</h1>
         <div className="flex items-center gap-[var(--s-3)]">
-          <Link to="/lecture/l01" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
+          <Link to={`/lecture/${firstLecture}`} className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
             Back to course
           </Link>
           <LogoutButton />

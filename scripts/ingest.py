@@ -17,6 +17,7 @@ from pathlib import Path
 import httpx
 import psycopg2
 import pytesseract
+import yt_dlp
 from dotenv import load_dotenv
 from PIL import Image, ImageStat
 
@@ -30,6 +31,10 @@ if os.name == "nt":
         pytesseract.pytesseract.tesseract_cmd = default_tesseract
 
 MEDIA_ROOT = Path(__file__).resolve().parents[1] / "media"
+# Source video lives here — mirrors gateway/app/routes/upload.py's own
+# LECTURES_DIR (that one's not importable from here: it's a FastAPI route
+# module, this is a standalone CLI script run as its own subprocess).
+LECTURES_DIR = Path(__file__).resolve().parents[1] / "lectures"
 DATABASE_URL = os.environ["DATABASE_URL"]
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL_ASR = os.environ.get("GROQ_MODEL_ASR", "whisper-large-v3-turbo")
@@ -53,6 +58,32 @@ OCR_CONFIDENCE_THRESHOLD = 0.6  # below this, fall back to vision_description
 SPOKEN_ELSEWHERE_THRESHOLD = 0.4  # word_similarity cutoff — tune against real footage
 CHUNK_MAX_CHARS = 500
 CHUNK_MAX_DURATION_MS = 30_000
+
+
+def download_youtube(url: str, lecture_id: str) -> Path:
+    """Downloads to LECTURES_DIR/{lecture_id}.mp4 — that exact literal path
+    matters: db/queries/lectures.sql's video_url falls back to
+    `{id}.mp4` whenever source_path is NULL (already true for this
+    YouTube-sourced lecture, see gateway's upload_from_youtube), so nothing
+    needs to come back and record the path afterward. `format`/
+    `merge_output_format` pin a real mp4 output (a native-mp4 remux when
+    available, not a re-encode) rather than trusting downstream ffmpeg to
+    tolerate whatever container yt-dlp would otherwise pick. Errors
+    (private/deleted/geo-blocked/age-restricted videos, bad URLs) raise
+    yt_dlp.utils.DownloadError, which the caller's own try/except already
+    turns into a normal job failure — no special handling needed here."""
+    LECTURES_DIR.mkdir(parents=True, exist_ok=True)
+    dest = LECTURES_DIR / f"{lecture_id}.mp4"
+    opts = {
+        "format": "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b",
+        "merge_output_format": "mp4",
+        "outtmpl": str(dest),
+        "quiet": True,
+        "noprogress": True,
+    }
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        ydl.download([url])
+    return dest
 
 
 def extract_audio(video_path: Path, lecture_id: str) -> Path:
@@ -618,7 +649,9 @@ def write_chunks(conn, lecture_id: str, chunks: list[dict]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--file", required=True, type=Path)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--file", type=Path)
+    source.add_argument("--youtube-url")
     parser.add_argument("--lecture-id", required=True)
     parser.add_argument("--course-id", default="18.06")
     parser.add_argument("--title", default=None)
@@ -628,14 +661,22 @@ def main() -> None:
 
     conn = psycopg2.connect(DATABASE_URL)
     ensure_lecture(conn, args.lecture_id, args.course_id, title, args.sequence)
-    set_duration(conn, args.lecture_id, probe_duration_ms(args.file))
 
     job_id = create_job(conn, args.lecture_id, "ingest")
     print(f"job {job_id} running")
 
     try:
-        update_job(conn, job_id, stage="audio_extraction", pct=0, message="Extracting mono 16kHz audio via ffmpeg")
-        audio_path = extract_audio(args.file, args.lecture_id)
+        if args.file:
+            local_path = args.file
+        else:
+            update_job(conn, job_id, stage="download", pct=0, message=f"Downloading from YouTube: {args.youtube_url}")
+            local_path = download_youtube(args.youtube_url, args.lecture_id)
+            print(f"downloaded: {local_path} ({local_path.stat().st_size / 1024 / 1024:.1f} MB)")
+
+        set_duration(conn, args.lecture_id, probe_duration_ms(local_path))
+
+        update_job(conn, job_id, stage="audio_extraction", pct=5, message="Extracting mono 16kHz audio via ffmpeg")
+        audio_path = extract_audio(local_path, args.lecture_id)
         print(f"audio extracted: {audio_path} ({audio_path.stat().st_size / 1024:.0f} KB)")
 
         update_job(conn, job_id, stage="transcription", pct=10, message=f"Transcribing via Groq {GROQ_MODEL_ASR}")
@@ -647,7 +688,7 @@ def main() -> None:
         print(f"wrote segments for {args.lecture_id}")
 
         update_job(conn, job_id, stage="frame_extraction", pct=30, message="Extracting frames at 1 per 5s via ffmpeg")
-        raw_dir = extract_frames(args.file, args.lecture_id)
+        raw_dir = extract_frames(local_path, args.lecture_id)
         raw_count = len(list(raw_dir.glob("f*.jpg")))
         print(f"extracted {raw_count} raw frames")
 

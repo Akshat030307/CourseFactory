@@ -32,10 +32,16 @@ async function fetchGraph(courseId: string, studentId?: string): Promise<CourseG
 // per-student `mastery` overlay changes with who's selected — omitting
 // studentId from the key would keep serving a previous student's mastery
 // after switching.
-export function useGraph(courseId: string, studentId?: string) {
+//
+// courseId is now derived (AppShell's current lecture/course), not a
+// hardcoded constant, so it's undefined on first paint until the lectures
+// list resolves — `enabled` keeps this from firing a
+// `GET /courses/undefined/graph`-shaped request in that window.
+export function useGraph(courseId: string | undefined, studentId?: string) {
   return useQuery({
-    queryKey: ['graph', courseId, studentId ?? null],
-    queryFn: () => fetchGraph(courseId, studentId),
+    queryKey: ['graph', courseId ?? null, studentId ?? null],
+    queryFn: () => fetchGraph(courseId!, studentId),
+    enabled: !!courseId,
     staleTime: Infinity,
   });
 }
