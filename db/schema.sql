@@ -222,6 +222,22 @@ CREATE TABLE jobs (
 );
 CREATE INDEX jobs_queue ON jobs (status, created_at) WHERE status = 'queued';
 
+-- --------------------------------------------------------------- waitlist
+-- Stage 14. Not self-service signup — the app is login-gated (Stage 13),
+-- one admin-issued account, no registration flow. This just captures
+-- interest so the admin can hand out real credentials manually, same
+-- spirit as questions.approved: a human in the loop, not automatic access.
+
+CREATE TABLE waitlist_signups (
+    id          BIGSERIAL PRIMARY KEY,
+    name        TEXT NOT NULL,
+    email       TEXT NOT NULL UNIQUE,
+    message     TEXT,
+    invited     BOOLEAN NOT NULL DEFAULT false,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX waitlist_signups_created ON waitlist_signups (created_at DESC);
+
 -- ------------------------------------------------------------------- notes
 --
 -- Graph edges live in AGE, not here:

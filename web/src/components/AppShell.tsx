@@ -96,6 +96,9 @@ export function AppShell({ view }: AppShellProps) {
           <Link to="/review" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
             Instructor queue
           </Link>
+          <Link to="/waitlist" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
+            Waitlist
+          </Link>
           <LogoutButton />
         </div>
       </header>

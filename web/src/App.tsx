@@ -5,7 +5,9 @@ import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { RequireAuth } from './components/RequireAuth';
 import { ReviewQueuePage } from './components/ReviewQueuePage';
+import { SignupPage } from './components/SignupPage';
 import { UploadPage } from './components/UploadPage';
+import { WaitlistPage } from './components/WaitlistPage';
 
 function App() {
   return (
@@ -57,6 +59,18 @@ function App() {
             </RequireAuth>
           }
         />
+        {/* Stage 14: still no self-service registration (see CLAUDE.md) —
+            /signup only ever writes to the waitlist table. /waitlist is
+            the admin-only view of it, gated like everything else above. */}
+        <Route
+          path="/waitlist"
+          element={
+            <RequireAuth>
+              <WaitlistPage />
+            </RequireAuth>
+          }
+        />
+        <Route path="/signup" element={<SignupPage />} />
         <Route path="/login" element={<LoginPage />} />
         {/* The real entry point — public, unlike everything above. Links
             into the gated app rather than skipping straight past it. */}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { useMe } from '../api/auth';
 import { useLectures } from '../api/lectures';
 
 // Stage 12: the whole app now shares this black-and-gold palette (was
@@ -55,6 +56,14 @@ function Reveal({ children, delayMs = 0 }: { children: ReactNode; delayMs?: numb
 export function LandingPage() {
   const { data: lectures } = useLectures();
   const firstLecture = lectures?.[0]?.id ?? 'l01';
+  // Stage 14: still invite-only (no self-service signup — see
+  // CLAUDE.md), so an anonymous visitor clicking straight into
+  // /course/18.06 or /upload just bounces off RequireAuth's redirect to
+  // /login. Checking auth state here means the nav/hero can point them at
+  // something they can actually do instead — /signup if they don't have a
+  // login, straight into the app if they do.
+  const { data: me } = useMe();
+  const authenticated = me?.authenticated ?? false;
 
   return (
     <div style={{ background: BLACK, color: CREAM, minHeight: '100vh' }}>
@@ -90,8 +99,8 @@ export function LandingPage() {
         .lp-link { transition: color 180ms ease; }
       `}</style>
 
-      <Nav />
-      <Hero firstLecture={firstLecture} />
+      <Nav authenticated={authenticated} />
+      <Hero firstLecture={firstLecture} authenticated={authenticated} />
       <Reveal>
         <Differentiators />
       </Reveal>
@@ -108,13 +117,13 @@ export function LandingPage() {
         <Distribution />
       </Reveal>
       <Reveal>
-        <FooterCta firstLecture={firstLecture} />
+        <FooterCta firstLecture={firstLecture} authenticated={authenticated} />
       </Reveal>
     </div>
   );
 }
 
-function Nav() {
+function Nav({ authenticated }: { authenticated: boolean }) {
   return (
     <header
       className="flex items-center justify-between px-[var(--s-5)] py-[var(--s-3)]"
@@ -124,31 +133,51 @@ function Nav() {
         Course<span style={{ color: CREAM }}>Factory</span>
       </Link>
       <nav className="flex items-center gap-[var(--s-4)] text-[var(--step--1)]">
-        <Link to="/course/18.06" className="lp-link" style={{ color: CREAM }}>
-          Dashboard
-        </Link>
-        <Link to="/drill" className="lp-link" style={{ color: CREAM }}>
-          Due reviews
-        </Link>
-        <Link to="/review" className="lp-link" style={{ color: CREAM }}>
-          Instructor queue
-        </Link>
-        <Link to="/upload" className="lp-link" style={{ color: CREAM }}>
-          Upload
-        </Link>
-        <Link
-          to="/lecture/l01"
-          className="lp-btn rounded-[var(--radius)] px-[var(--s-3)] py-[var(--s-1)] font-medium"
-          style={{ background: GOLD, color: BLACK }}
-        >
-          Try the Demo
-        </Link>
+        {authenticated ? (
+          <>
+            <Link to="/course/18.06" className="lp-link" style={{ color: CREAM }}>
+              Dashboard
+            </Link>
+            <Link to="/drill" className="lp-link" style={{ color: CREAM }}>
+              Due reviews
+            </Link>
+            <Link to="/review" className="lp-link" style={{ color: CREAM }}>
+              Instructor queue
+            </Link>
+            <Link to="/upload" className="lp-link" style={{ color: CREAM }}>
+              Upload
+            </Link>
+            <Link to="/waitlist" className="lp-link" style={{ color: CREAM }}>
+              Waitlist
+            </Link>
+            <Link
+              to="/lecture/l01"
+              className="lp-btn rounded-[var(--radius)] px-[var(--s-3)] py-[var(--s-1)] font-medium"
+              style={{ background: GOLD, color: BLACK }}
+            >
+              Open App
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link to="/login" className="lp-link" style={{ color: CREAM }}>
+              Log In
+            </Link>
+            <Link
+              to="/signup"
+              className="lp-btn rounded-[var(--radius)] px-[var(--s-3)] py-[var(--s-1)] font-medium"
+              style={{ background: GOLD, color: BLACK }}
+            >
+              Join Waitlist
+            </Link>
+          </>
+        )}
       </nav>
     </header>
   );
 }
 
-function Hero({ firstLecture }: { firstLecture: string }) {
+function Hero({ firstLecture, authenticated }: { firstLecture: string; authenticated: boolean }) {
   return (
     <section className="relative mx-auto flex max-w-4xl flex-col items-start gap-[var(--s-4)] overflow-hidden px-[var(--s-5)] py-[var(--s-6)]">
       <div className="lp-hero-glow" />
@@ -176,20 +205,41 @@ function Hero({ firstLecture }: { firstLecture: string }) {
         often in a <em>different</em> lecture — that fixes it.
       </p>
       <div className="lp-hero-item flex flex-wrap gap-[var(--s-3)]" style={{ animationDelay: '240ms' }}>
-        <Link
-          to="/upload"
-          className="lp-btn rounded-[var(--radius)] px-[var(--s-4)] py-[var(--s-2)] font-medium"
-          style={{ background: GOLD, color: BLACK }}
-        >
-          Upload Your Lecture
-        </Link>
-        <Link
-          to={`/lecture/${firstLecture}`}
-          className="lp-btn rounded-[var(--radius)] px-[var(--s-4)] py-[var(--s-2)]"
-          style={{ border: `1px solid ${GOLD_DIM}`, color: GOLD }}
-        >
-          Try the Demo
-        </Link>
+        {authenticated ? (
+          <>
+            <Link
+              to="/upload"
+              className="lp-btn rounded-[var(--radius)] px-[var(--s-4)] py-[var(--s-2)] font-medium"
+              style={{ background: GOLD, color: BLACK }}
+            >
+              Upload Your Lecture
+            </Link>
+            <Link
+              to={`/lecture/${firstLecture}`}
+              className="lp-btn rounded-[var(--radius)] px-[var(--s-4)] py-[var(--s-2)]"
+              style={{ border: `1px solid ${GOLD_DIM}`, color: GOLD }}
+            >
+              Open the App
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link
+              to="/signup"
+              className="lp-btn rounded-[var(--radius)] px-[var(--s-4)] py-[var(--s-2)] font-medium"
+              style={{ background: GOLD, color: BLACK }}
+            >
+              Join the Waitlist
+            </Link>
+            <Link
+              to="/login"
+              className="lp-btn rounded-[var(--radius)] px-[var(--s-4)] py-[var(--s-2)]"
+              style={{ border: `1px solid ${GOLD_DIM}`, color: GOLD }}
+            >
+              Log In
+            </Link>
+          </>
+        )}
         <a
           href="#how-it-works"
           className="lp-btn rounded-[var(--radius)] px-[var(--s-4)] py-[var(--s-2)]"
@@ -441,7 +491,7 @@ function Distribution() {
   );
 }
 
-function FooterCta({ firstLecture }: { firstLecture: string }) {
+function FooterCta({ firstLecture, authenticated }: { firstLecture: string; authenticated: boolean }) {
   return (
     <footer className="px-[var(--s-5)] py-[var(--s-6)] text-center" style={{ borderTop: `1px solid ${LINE}` }}>
       <div className="flex flex-wrap justify-center gap-[var(--s-5)] text-[var(--step--1)]" style={{ color: CREAM, opacity: 0.6 }}>
@@ -450,11 +500,11 @@ function FooterCta({ firstLecture }: { firstLecture: string }) {
         <span>✓ Built for speed. Built for learning.</span>
       </div>
       <Link
-        to={`/lecture/${firstLecture}`}
+        to={authenticated ? `/lecture/${firstLecture}` : '/signup'}
         className="lp-btn mt-[var(--s-4)] inline-block rounded-[var(--radius)] px-[var(--s-5)] py-[var(--s-2)] font-medium"
         style={{ background: GOLD, color: BLACK }}
       >
-        Get Started for Free
+        {authenticated ? 'Open the App' : 'Join the Waitlist'}
       </Link>
     </footer>
   );

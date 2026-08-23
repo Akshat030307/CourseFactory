@@ -13,7 +13,13 @@ private, but the landing page is public by design (LandingPage.tsx, no
 RequireAuth wrapper) and embeds the Telegram QR code directly in its HTML —
 found live, on the actual deployment, that gating ALL of /media caught that
 asset too, breaking the QR image for exactly the anonymous visitors it
-exists to reach. scripts/generate_bot_qr.py writes there specifically."""
+exists to reach. scripts/generate_bot_qr.py writes there specifically.
+
+Stage 14: PUBLIC_METHOD_PATHS handles the one route where the SAME path
+needs different auth by HTTP method — POST /waitlist (anyone can join) vs
+GET /waitlist (only a logged-in admin can see who's on it). Everything
+else in this file is path-only; this is deliberately the one exception
+rather than a reason to redesign the whole allowlist around methods."""
 
 from app.auth import is_authorized
 
@@ -24,6 +30,9 @@ PUBLIC_PATHS = {
     "/api/v1/auth/me",
 }
 PUBLIC_PREFIXES = ("/media/public/",)
+PUBLIC_METHOD_PATHS = {
+    ("POST", "/api/v1/waitlist"),
+}
 
 
 def _header(headers: list[tuple[bytes, bytes]], name: bytes) -> str:
@@ -43,7 +52,8 @@ class AuthMiddleware:
             return
 
         path = scope["path"]
-        if path in PUBLIC_PATHS or path.startswith(PUBLIC_PREFIXES):
+        method = scope.get("method", "")
+        if path in PUBLIC_PATHS or path.startswith(PUBLIC_PREFIXES) or (method, path) in PUBLIC_METHOD_PATHS:
             await self.app(scope, receive, send)
             return
 
