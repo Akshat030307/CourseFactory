@@ -5,6 +5,7 @@ export interface LatestJob {
   id: string;
   lecture_id: string | null;
   status: string;
+  error: string | null;
 }
 
 async function fetchLatestJob(): Promise<LatestJob | null> {

@@ -10,9 +10,19 @@ export function TracePanel() {
 
   if (latestJob.status !== 'running') {
     return (
-      <p className="text-[var(--dust)]">
-        No job running. Last: {latestJob.lecture_id ?? '—'} ({latestJob.status}).
-      </p>
+      <div className="flex flex-col gap-[var(--s-1)]">
+        <p className="text-[var(--dust)]">
+          No job running. Last: {latestJob.lecture_id ?? '—'} ({latestJob.status}).
+        </p>
+        {/* Live trace.error (below) only exists while a WS connection was
+            open when the job failed — easy to miss on a job that fails in
+            ~1s (e.g. a YouTube download rejected before any real work
+            starts). This is the same error, read back from the job row
+            itself, so it's visible on a later page load too. */}
+        {latestJob.status === 'failed' && latestJob.error && (
+          <p className="text-[var(--error)]">{latestJob.error}</p>
+        )}
+      </div>
     );
   }
 

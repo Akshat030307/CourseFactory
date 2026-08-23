@@ -10,6 +10,7 @@ class LatestJob(BaseModel):
     id: str
     lecture_id: str | None
     status: str
+    error: str | None
 
 
 @router.get("/jobs/latest")

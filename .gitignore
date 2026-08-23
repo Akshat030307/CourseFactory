@@ -1,4 +1,5 @@
 .env
+youtube_cookies.txt
 media/
 lectures/*.mp4
 node_modules/

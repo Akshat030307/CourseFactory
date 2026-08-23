@@ -61,6 +61,14 @@ services:
     volumes:
       - lectures_data:/app/lectures
       - media_data:/app/media
+      # Stage 16 — real YouTube cookies for scripts/ingest.py's download
+      # step (see YOUTUBE_COOKIES_FILE in .env.example: a real VPS's
+      # datacenter IP trips YouTube's bot check on every video without
+      # this). A named volume, not baked into the image or shipped through
+      # the regular code-deploy tarball — the file itself is account
+      # credentials and never touches git. Seed/update it directly:
+      #   docker cp youtube_cookies.txt coursefactory-gateway-1:/app/secrets/youtube_cookies.txt
+      - youtube_cookies_data:/app/secrets
     depends_on:
       postgres:
         condition: service_healthy
@@ -113,5 +121,6 @@ volumes:
   pgdata:
   lectures_data:
   media_data:
+  youtube_cookies_data:
   caddy_data:
   caddy_config:
