@@ -1,0 +1,49 @@
+# Reverse proxy + static frontend host, one Caddy instance instead of a
+# separate nginx-for-static + nginx-for-proxy pair.
+#
+# {$DOMAIN} comes from docker-compose.prod.yml's environment. Point it at a
+# real domain (with DNS already resolving to this VPS) and Caddy provisions
+# a real Let's Encrypt cert automatically — no certbot, no manual renewal
+# cron. For a first smoke-test before DNS is live, DOMAIN=localhost works
+# end-to-end (verified directly — login, cookies, everything) with Caddy's
+# own locally-trusted self-signed cert instead of a real one. A bare IP
+# also gets a real cert from Caddy (confirmed in its own logs: "certificate
+# obtained successfully ... issuer: local"), but couldn't be fully
+# round-trip tested from this Windows dev box specifically — Windows'
+# schannel-backed curl doesn't send SNI for IP-literal connections, which
+# is a client-side testing limitation, not a Caddy or deployment issue; a
+# real browser or a Linux VPS's own curl doesn't have this problem.
+{$DOMAIN} {
+	# Video files can be large — matches CLAUDE.md's own "full lectures,
+	# not just 8-12 min fixtures" real-world upload case.
+	request_body {
+		max_size 2GB
+	}
+
+	handle /api/* {
+		reverse_proxy gateway:8000
+	}
+
+	handle /ws {
+		reverse_proxy gateway:8000
+	}
+
+	handle /lectures/* {
+		reverse_proxy gateway:8000
+	}
+
+	handle /media/* {
+		reverse_proxy gateway:8000
+	}
+
+	# The built SPA. try_files falls back to index.html for any path that
+	# isn't a real static asset, so client-side routes (/lecture/l01, etc.)
+	# work on a hard refresh instead of 404ing at the edge.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	encode gzip
+}

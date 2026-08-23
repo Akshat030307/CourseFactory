@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useApproveByConcept, useApproveQuestion, useRejectQuestion, useReviewQueue, type ReviewItem } from '../api/reviewQueue';
+import { LogoutButton } from './AppShell';
 
 // X4 (Stage 9): instructor-facing, not student-facing — CLAUDE.md: "one
 // hardcoded student, one instructor," no auth to gate this behind, so it's
@@ -29,9 +30,12 @@ export function ReviewQueuePage() {
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-[var(--s-4)] p-[var(--s-5)]">
       <div className="flex items-center justify-between">
         <h1 className="font-[var(--font-display)] text-[var(--step-2)] text-[var(--chalk)]">Review queue</h1>
-        <Link to="/lecture/l01" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
-          Back to course
-        </Link>
+        <div className="flex items-center gap-[var(--s-3)]">
+          <Link to="/lecture/l01" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
+            Back to course
+          </Link>
+          <LogoutButton />
+        </div>
       </div>
 
       {isPending && <p className="text-[var(--dust)]">Loading…</p>}

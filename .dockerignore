@@ -1,0 +1,18 @@
+# Keeps the build context small and the two builds (gateway/Dockerfile,
+# deploy/web.Dockerfile) from re-sending things they either rebuild
+# themselves (node_modules via npm ci) or never need at all (real lecture
+# videos — real fixture data lives in named volumes at runtime, not in the
+# image). Found this mattered for real: without it the context was 108MB
+# and took ~65s to transfer for a page that's a 45kB gzipped bundle.
+.git/
+node_modules/
+web/node_modules/
+web/dist/
+lectures/*.mp4
+media/
+db/backups/*.sql
+__pycache__/
+*.pyc
+.venv/
+.rocketride/
+.env

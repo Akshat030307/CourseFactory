@@ -1,0 +1,117 @@
+# VPS deployment (Stage 13). Not the same file as docker-compose.yml —
+# that one's still the local-dev "postgres + edge-tts only, everything else
+# runs on the host with hot reload" setup, and stays that way; this is a
+# separate, real production stack. See docs/DEPLOYMENT.md for the actual
+# runbook (DNS, .env, first run).
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Only Caddy publishes a port to the host (80/443). Everything else is
+# reachable solely over the internal Docker network, by service name —
+# Postgres in particular is deliberately NOT exposed here the way local
+# dev's docker-compose.yml exposes it on 5433, since there's no other
+# project on a real VPS to avoid colliding with.
+
+services:
+  postgres:
+    build: ./db
+    environment:
+      POSTGRES_USER: coursefactory
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a real POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: coursefactory
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coursefactory"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  edge-tts:
+    build: ./services/edge-tts
+    restart: unless-stopped
+
+  gateway:
+    image: coursefactory/gateway:latest
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    env_file: .env
+    environment:
+      # Only the two values that are ALWAYS correct regardless of domain,
+      # port, or HTTP-vs-HTTPS shape — internal Docker network addresses,
+      # not user-facing config. Overrides whatever .env has for these two
+      # specific keys with the container-network address (compose gives
+      # environment: precedence over env_file: for the same key).
+      #
+      # PUBLIC_HOST and COOKIE_SECURE deliberately do NOT get hardcoded
+      # here — an earlier version of this file assumed `https://${DOMAIN}`
+      # and COOKIE_SECURE=true always made sense, which breaks the
+      # shared-VPS/no-domain-yet case (docker-compose.prod.shared-vps.yml,
+      # DOMAIN=:8020): that resolved to the nonsense PUBLIC_HOST
+      # "https://:8020" (silently breaking CORS — the real request's
+      # origin, http://<ip>:8020, could never match it) and forced a
+      # Secure cookie onto a plain-HTTP deployment (silently dropped by
+      # every browser). Found both live, on the actual VPS, not in review.
+      # .env is the single source of truth for these two now, like every
+      # other variable already was.
+      DATABASE_URL: postgresql://coursefactory:${POSTGRES_PASSWORD}@postgres:5432/coursefactory
+      EDGE_TTS_URL: http://edge-tts:5002
+    volumes:
+      - lectures_data:/app/lectures
+      - media_data:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      edge-tts:
+        condition: service_started
+    restart: unless-stopped
+
+  # D2's bot, always-on instead of a laptop-tied local process — the actual
+  # point of putting this on a VPS. Same image as gateway (it needs a
+  # strict subset of the same deps — asyncpg, httpx, python-telegram-bot —
+  # not worth a second Dockerfile at this scale), different command.
+  telegram-bot:
+    image: coursefactory/gateway:latest
+    env_file: .env
+    environment:
+      # PUBLIC_HOST intentionally not overridden here either — same reason
+      # as the gateway service above. telegram_bot.py builds its deep
+      # links directly from it (deep_link() in that file); a hardcoded
+      # "https://${DOMAIN}" would have sent broken links in the shared-VPS
+      # case, same as it broke the gateway's CORS.
+      DATABASE_URL: postgresql://coursefactory:${POSTGRES_PASSWORD}@postgres:5432/coursefactory
+      GATEWAY_URL: http://gateway:8000
+    command: ["python", "/app/scripts/telegram_bot.py"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      gateway:
+        condition: service_started
+    restart: unless-stopped
+
+  caddy:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Cert/state persistence — without this, every restart re-provisions
+      # from Let's Encrypt, which has a real rate limit you can hit.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - gateway
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  lectures_data:
+  media_data:
+  caddy_data:
+  caddy_config:

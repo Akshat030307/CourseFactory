@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from './http';
 
 export interface Claim {
   lecture_id: string;
@@ -15,7 +16,7 @@ export interface Contradiction {
 }
 
 async function fetchContradictions(courseId: string): Promise<Contradiction[]> {
-  const res = await fetch(`/api/v1/courses/${courseId}/contradictions`);
+  const res = await apiFetch(`/api/v1/courses/${courseId}/contradictions`);
   if (!res.ok) throw new Error(`Failed to fetch contradictions: ${res.status}`);
   return res.json();
 }

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from './http';
 
 export interface Segment {
   id: string;
@@ -9,7 +10,7 @@ export interface Segment {
 }
 
 async function fetchSegments(lectureId: string): Promise<Segment[]> {
-  const res = await fetch(`/api/v1/lectures/${lectureId}/segments`);
+  const res = await apiFetch(`/api/v1/lectures/${lectureId}/segments`);
   if (!res.ok) throw new Error(`Failed to fetch segments: ${res.status}`);
   return res.json();
 }

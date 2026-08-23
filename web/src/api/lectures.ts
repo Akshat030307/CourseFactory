@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from './http';
 
 export interface Lecture {
   id: string;
@@ -17,7 +18,7 @@ export interface Course {
 }
 
 async function fetchCourses(): Promise<Course[]> {
-  const res = await fetch('/api/v1/courses');
+  const res = await apiFetch('/api/v1/courses');
   if (!res.ok) throw new Error(`Failed to fetch courses: ${res.status}`);
   return res.json();
 }
@@ -31,7 +32,7 @@ export function useCourses() {
 }
 
 async function fetchLectures(): Promise<Lecture[]> {
-  const res = await fetch('/api/v1/lectures');
+  const res = await apiFetch('/api/v1/lectures');
   if (!res.ok) throw new Error(`Failed to fetch lectures: ${res.status}`);
   return res.json();
 }

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from './http';
 import type { QuizOption } from './quiz';
 
 export interface ReviewItem {
@@ -18,7 +19,7 @@ export interface ReviewItem {
 }
 
 async function fetchReviewQueue(courseId: string): Promise<ReviewItem[]> {
-  const res = await fetch(`/api/v1/review-queue?course_id=${courseId}`);
+  const res = await apiFetch(`/api/v1/review-queue?course_id=${courseId}`);
   if (!res.ok) throw new Error(`Failed to fetch review queue: ${res.status}`);
   return res.json();
 }
@@ -39,7 +40,7 @@ export function useApproveQuestion() {
   const invalidate = useInvalidateReviewQueue();
   return useMutation({
     mutationFn: async (questionId: string) => {
-      const res = await fetch(`/api/v1/questions/${questionId}/approve`, { method: 'POST' });
+      const res = await apiFetch(`/api/v1/questions/${questionId}/approve`, { method: 'POST' });
       if (!res.ok) throw new Error(`Failed to approve: ${res.status}`);
       return res.json();
     },
@@ -51,7 +52,7 @@ export function useRejectQuestion() {
   const invalidate = useInvalidateReviewQueue();
   return useMutation({
     mutationFn: async (questionId: string) => {
-      const res = await fetch(`/api/v1/questions/${questionId}/reject`, { method: 'POST' });
+      const res = await apiFetch(`/api/v1/questions/${questionId}/reject`, { method: 'POST' });
       if (!res.ok) throw new Error(`Failed to reject: ${res.status}`);
       return res.json();
     },
@@ -63,7 +64,7 @@ export function useApproveByConcept() {
   const invalidate = useInvalidateReviewQueue();
   return useMutation({
     mutationFn: async (conceptId: string) => {
-      const res = await fetch('/api/v1/review-queue/approve', {
+      const res = await apiFetch('/api/v1/review-queue/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ concept_id: conceptId }),

@@ -419,7 +419,7 @@ function Distribution() {
             due reviews from your phone.
           </p>
           <img
-            src="/media/telegram_bot_qr.png"
+            src="/media/public/telegram_bot_qr.png"
             alt="Scan to open the Course Factory Telegram bot"
             className="h-32 w-32 rounded-[var(--radius)] bg-white p-[var(--s-2)]"
           />

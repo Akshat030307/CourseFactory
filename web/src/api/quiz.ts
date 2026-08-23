@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from './http';
 
 export interface QuizOption {
   id: string;
@@ -48,7 +49,7 @@ export interface DueQuestion {
 }
 
 async function fetchQuiz(lectureId: string): Promise<QuizQuestion[]> {
-  const res = await fetch(`/api/v1/lectures/${lectureId}/quiz`);
+  const res = await apiFetch(`/api/v1/lectures/${lectureId}/quiz`);
   if (!res.ok) throw new Error(`Failed to fetch quiz: ${res.status}`);
   return res.json();
 }
@@ -62,7 +63,7 @@ export function useQuiz(lectureId: string) {
 }
 
 async function fetchDueQuestions(studentId: string): Promise<DueQuestion[]> {
-  const res = await fetch(`/api/v1/schedule?student_id=${studentId}`);
+  const res = await apiFetch(`/api/v1/schedule?student_id=${studentId}`);
   if (!res.ok) throw new Error(`Failed to fetch schedule: ${res.status}`);
   return res.json();
 }
@@ -81,7 +82,7 @@ interface AttemptArgs {
 }
 
 async function submitAttempt({ questionId, chosenOptionId, studentId }: AttemptArgs): Promise<AttemptResult> {
-  const res = await fetch('/api/v1/attempts', {
+  const res = await apiFetch('/api/v1/attempts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question_id: questionId, chosen_option_id: chosenOptionId, student_id: studentId }),

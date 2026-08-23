@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from './http';
 
 export interface GraphNode {
   id: string;
@@ -20,7 +21,7 @@ export interface CourseGraph {
 }
 
 async function fetchGraph(courseId: string): Promise<CourseGraph> {
-  const res = await fetch(`/api/v1/courses/${courseId}/graph`);
+  const res = await apiFetch(`/api/v1/courses/${courseId}/graph`);
   if (!res.ok) throw new Error(`Failed to fetch graph: ${res.status}`);
   return res.json();
 }

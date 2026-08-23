@@ -5,3 +5,16 @@ Pillow==12.3.0
 pytesseract==0.3.13
 mcp==2.0.0
 starlette<0.42.0,>=0.40.0
+# scripts/telegram_bot.py — not previously listed here even though it's
+# been runnable since Stage 8 (D2); this file only ever tracked
+# ingest.py + mcp_server.py's deps. Needed now that the bot runs as its own
+# container in production rather than a manually-started local process.
+asyncpg==0.30.0
+python-telegram-bot==22.8
+# scripts/generate_bot_qr.py — same gap as above, caught live in production:
+# the landing page's QR image 404'd on the deployed VPS because the gateway
+# image never had this installed, so a rebuild there couldn't have
+# regenerated it either. media/ itself is correctly gitignored/dockerignored
+# (generated content) — this is about the *script* being runnable in the
+# built image, not about baking the PNG in.
+qrcode==8.2

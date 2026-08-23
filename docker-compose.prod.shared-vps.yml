@@ -1,0 +1,30 @@
+# Overlay for a VPS that already has other projects holding 80/443 (this
+# repo's actual case: mesh-caddy already owns both on the real deployment
+# target). Doesn't touch docker-compose.prod.yml itself — that file stays
+# the clean default for "you own the whole VPS." Compose's own layering
+# (`-f base -f override`) is the intended way to express this, not a
+# second copy of the whole file or conditionals inside one file.
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.prod.shared-vps.yml up -d --build
+#
+# Also set in .env:
+#   DOMAIN=:8020
+# A port-only Caddy address (no hostname) means "plain HTTP on this port,
+# no automatic HTTPS" — deliberate, not a fallback: there's no domain
+# pointed here yet to get a real cert for, and mixing Docker's host-port
+# remapping with Caddy's automatic HTTPS-redirect logic on a *different*
+# external port gets confusing fast (Caddy has no way to know the outside
+# world reaches it on 8020, not 443, so its own redirect would point at
+# the wrong port). Once a real subdomain exists, switch DOMAIN to it and
+# drop this overlay file — CADDY_PORT goes away, standard 80/443 resume,
+# nothing else about the Caddyfile changes.
+services:
+  caddy:
+    # !override, not a plain list — Compose's default merge behavior for
+    # list-type fields like `ports` is to APPEND the override's entries to
+    # the base file's, not replace them (found this live: the merged
+    # config had 80, 443, AND 8020 all requested at once, and 80/443 lost
+    # to mesh-caddy, which already held them). !override forces replace
+    # semantics for just this key.
+    ports: !override
+      - "${CADDY_PORT:-8020}:${CADDY_PORT:-8020}"

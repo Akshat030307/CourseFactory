@@ -30,6 +30,12 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://localhost:8000")
 PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "http://localhost:5173")
+# Stage 13: the gateway now requires auth on every route (VPS deployment —
+# see gateway/app/auth_middleware.py). This runs as a local subprocess
+# Claude Desktop spawns, with no login flow of its own — it authenticates
+# with the static service key instead, same as scripts/telegram_bot.py.
+SERVICE_API_KEY = os.environ.get("SERVICE_API_KEY", "")
+GATEWAY_HEADERS = {"Authorization": f"Bearer {SERVICE_API_KEY}"}
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 # llama-3.3-70b-versatile 404s as of this build (checked Groq's live
 # /models list — see .env.example) — openai/gpt-oss-120b is current.
@@ -57,7 +63,7 @@ async def _find_concept(course_id: str, name: str) -> dict | None:
     insensitive substring match against the already-fetched node list is
     simpler and just as correct as adding a dedicated lookup endpoint to
     the gateway for MCP's sole benefit."""
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(headers=GATEWAY_HEADERS) as client:
         r = await client.get(f"{GATEWAY_URL}/api/v1/courses/{course_id}/graph")
         r.raise_for_status()
         graph = r.json()
@@ -77,7 +83,7 @@ async def search_course(query: str, course_id: str, lane: str = "both") -> str:
     "spoken", "written", or "both" — "written" finds board content that
     was never said aloud, the thing no transcript-only search engine can
     do. Returns ranked moments with a deep link to each."""
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(headers=GATEWAY_HEADERS) as client:
         r = await client.post(
             f"{GATEWAY_URL}/api/v1/search",
             json={"query": query, "lane": lane, "course_id": course_id, "limit": 5},
@@ -107,7 +113,7 @@ async def explain_concept(concept: str, course_id: str) -> str:
     if node is None:
         return f'No concept matching "{concept}" found in course {course_id}.'
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(headers=GATEWAY_HEADERS) as client:
         r = await client.get(f"{GATEWAY_URL}/api/v1/concepts/{node['id']}", timeout=15)
         r.raise_for_status()
         detail = r.json()
@@ -152,7 +158,7 @@ async def get_moment(lecture_id: str, timestamp_ms: int) -> str:
     """Get the transcript and board text around a specific moment in a
     lecture."""
     window_ms = 20_000
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(headers=GATEWAY_HEADERS) as client:
         seg_r, frame_r = await client.get(
             f"{GATEWAY_URL}/api/v1/lectures/{lecture_id}/segments",
             params={"from_ms": max(0, timestamp_ms - window_ms), "to_ms": timestamp_ms + window_ms},
@@ -210,6 +216,9 @@ async def _call_chat(url: str, api_key: str, model: str, prompt: str, reasoning_
         # any visible content (found the hard way building build_graph.py).
         body["reasoning_effort"] = reasoning_effort
         body["max_completion_tokens"] = 1000
+    # Not a gateway call (Groq/OpenAI directly) — GATEWAY_HEADERS's bearer
+    # token has no business here, unlike the other four AsyncClient uses in
+    # this file. Its own Authorization header below is the real one.
     async with httpx.AsyncClient() as client:
         r = await client.post(url, headers={"Authorization": f"Bearer {api_key}"}, json=body, timeout=30)
         r.raise_for_status()

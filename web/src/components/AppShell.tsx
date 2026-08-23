@@ -11,6 +11,7 @@ import { SplitView } from './SplitView';
 import { TracePanel } from './TracePanel';
 import { TranscriptLane } from './TranscriptLane';
 import { VideoPlayer } from './VideoPlayer';
+import { useLogout } from '../api/auth';
 import { useLectures } from '../api/lectures';
 import { useActiveContradiction } from '../contradictions/activeContradiction';
 import { useNavStack } from '../nav/navStack';
@@ -95,6 +96,7 @@ export function AppShell({ view }: AppShellProps) {
           <Link to="/review" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
             Instructor queue
           </Link>
+          <LogoutButton />
         </div>
       </header>
 
@@ -192,6 +194,22 @@ export function AppShell({ view }: AppShellProps) {
         </div>
       )}
     </div>
+  );
+}
+
+// Exported so the standalone pages (DrillPage, ReviewQueuePage, UploadPage)
+// can reuse the same control in their own headers rather than each
+// reimplementing the logout call.
+export function LogoutButton() {
+  const logout = useLogout();
+  return (
+    <button
+      onClick={() => logout.mutate()}
+      disabled={logout.isPending}
+      className="text-[var(--step--1)] text-[var(--dust)] hover:text-[var(--chalk)] disabled:opacity-50"
+    >
+      Log out
+    </button>
   );
 }
 

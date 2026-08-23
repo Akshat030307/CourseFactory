@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from './http';
 
 export interface Frame {
   id: string;
@@ -11,7 +12,7 @@ export interface Frame {
 }
 
 async function fetchFrames(lectureId: string): Promise<Frame[]> {
-  const res = await fetch(`/api/v1/lectures/${lectureId}/frames`);
+  const res = await apiFetch(`/api/v1/lectures/${lectureId}/frames`);
   if (!res.ok) throw new Error(`Failed to fetch frames: ${res.status}`);
   return res.json();
 }

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from './http';
 
 export interface LatestJob {
   id: string;
@@ -7,7 +8,7 @@ export interface LatestJob {
 }
 
 async function fetchLatestJob(): Promise<LatestJob | null> {
-  const res = await fetch('/api/v1/jobs/latest');
+  const res = await apiFetch('/api/v1/jobs/latest');
   if (!res.ok) throw new Error(`Failed to fetch latest job: ${res.status}`);
   return res.json();
 }

@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { apiFetch } from './http';
 
 export type Lane = 'spoken' | 'written' | 'both';
 
@@ -26,7 +27,7 @@ interface SearchArgs {
 }
 
 async function runSearch({ query, lane, courseId, lectureId }: SearchArgs): Promise<SearchResponse> {
-  const res = await fetch('/api/v1/search', {
+  const res = await apiFetch('/api/v1/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, lane, course_id: courseId, lecture_id: lectureId ?? null, limit: 10 }),

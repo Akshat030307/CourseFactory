@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCourses } from '../api/lectures';
 import { useUploadLecture } from '../api/upload';
+import { LogoutButton } from './AppShell';
 
 const NEW_COURSE = '__new__';
 
@@ -41,9 +42,12 @@ export function UploadPage() {
     <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-[var(--s-4)] p-[var(--s-5)]">
       <div className="flex items-center justify-between">
         <h1 className="font-[var(--font-display)] text-[var(--step-2)] text-[var(--chalk)]">Upload a lecture</h1>
-        <Link to="/" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
-          Back to home
-        </Link>
+        <div className="flex items-center gap-[var(--s-3)]">
+          <Link to="/" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
+            Back to home
+          </Link>
+          <LogoutButton />
+        </div>
       </div>
 
       <p className="text-[var(--step--1)] text-[var(--dust)]">

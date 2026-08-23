@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDueQuestions, useSubmitAttempt, type AttemptResult, type DueQuestion } from '../api/quiz';
+import { LogoutButton } from './AppShell';
 import { RemediationCard } from './RemediationCard';
 
 // D3 (Stage 8): the in-app drill — due reviews across the whole course,
@@ -52,9 +53,12 @@ export function DrillPage() {
     <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-[var(--s-4)] p-[var(--s-5)]">
       <div className="flex items-center justify-between">
         <h1 className="font-[var(--font-display)] text-[var(--step-2)] text-[var(--chalk)]">Review</h1>
-        <Link to="/lecture/l01" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
-          Back to course
-        </Link>
+        <div className="flex items-center gap-[var(--s-3)]">
+          <Link to="/lecture/l01" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
+            Back to course
+          </Link>
+          <LogoutButton />
+        </div>
       </div>
 
       {isPending && <p className="text-[var(--dust)]">Loading…</p>}

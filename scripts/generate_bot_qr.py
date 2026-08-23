@@ -17,7 +17,12 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-OUT_PATH = Path(__file__).resolve().parents[1] / "media" / "telegram_bot_qr.png"
+# media/public/, not media/ directly — Stage 13's auth gate protects real
+# course content under /media/*, but this QR code is embedded on the
+# public landing page (no login wall) and needs to stay visible to
+# anonymous visitors. gateway/app/auth_middleware.py carves out exactly
+# this one subpath as the exception.
+OUT_PATH = Path(__file__).resolve().parents[1] / "media" / "public" / "telegram_bot_qr.png"
 
 
 def main() -> None:

@@ -3,8 +3,9 @@
 Upload a lecture. Get a course that knows what you don't understand yet — and
 points at the exact ninety seconds, often in a *different* lecture, that fixes it.
 
-Built on RocketRide. 24-hour hackathon build, runs locally, costs roughly
-**1.5 cents per lecture**.
+Built on RocketRide. Started as a 24-hour hackathon build; runs locally for
+development, costs roughly **1.5 cents per lecture**. Real login-gated VPS
+deployment now exists too — see `docs/DEPLOYMENT.md`.
 
 ## What makes it different
 
@@ -41,6 +42,7 @@ python scripts/ingest.py --file lectures/l01.mp4 --lecture-id l01
 | `docs/ARCHITECTURE.md` | System shape, ingestion, graph model |
 | `docs/API.md` | Gateway REST + WebSocket contract |
 | `docs/PIPELINES.md` | RocketRide wiring and unresolved questions |
+| `docs/DEPLOYMENT.md` | Running this for real on a VPS |
 | `db/schema.sql` | Postgres + pgvector + Apache AGE |
 
 Ticket **F2** resolves the RocketRide unknowns, and one of them sits on the

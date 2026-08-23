@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from './http';
 
 export interface UploadArgs {
   file: File;
@@ -19,7 +20,7 @@ async function uploadLecture(args: UploadArgs): Promise<UploadResponse> {
   if (args.courseId) form.append('course_id', args.courseId);
   if (args.newCourseTitle) form.append('new_course_title', args.newCourseTitle);
 
-  const res = await fetch('/api/v1/upload', { method: 'POST', body: form });
+  const res = await apiFetch('/api/v1/upload', { method: 'POST', body: form });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.title ?? `Upload failed: ${res.status}`);

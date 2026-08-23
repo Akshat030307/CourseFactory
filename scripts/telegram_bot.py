@@ -38,6 +38,12 @@ TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://localhost:8000")
 PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "http://localhost:5173")
 DEMO_STUDENT_ID = os.environ.get("DEMO_STUDENT_ID", "s1")
+# Stage 13: the gateway now requires auth on every route (VPS deployment —
+# see gateway/app/auth_middleware.py). This bot has no login flow of its
+# own and shouldn't need one — it's a trusted, same-deployment caller, so
+# it authenticates with the static service key instead of a user session.
+SERVICE_API_KEY = os.environ.get("SERVICE_API_KEY", "")
+GATEWAY_HEADERS = {"Authorization": f"Bearer {SERVICE_API_KEY}"}
 
 
 def deep_link(lecture_id: str, timestamp_ms: int) -> str:
@@ -82,7 +88,7 @@ async def due(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Not registered yet — send /start first.")
         return
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(headers=GATEWAY_HEADERS) as client:
         r = await client.get(f"{GATEWAY_URL}/api/v1/schedule", params={"student_id": student_id}, timeout=15)
         r.raise_for_status()
         due_questions = r.json()
@@ -111,7 +117,7 @@ async def on_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await query.edit_message_text("Not registered — send /start first.")
         return
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(headers=GATEWAY_HEADERS) as client:
         r = await client.post(
             f"{GATEWAY_URL}/api/v1/attempts",
             json={"question_id": question_id, "chosen_option_id": chosen_option_id, "student_id": student_id},
