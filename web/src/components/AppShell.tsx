@@ -149,7 +149,14 @@ export function AppShell({ view }: AppShellProps) {
           <div className="flex h-full flex-col gap-[var(--s-4)]">
             <VideoPlayer lectureId={id} videoUrl={currentLecture.video_url} initialSeekMs={initialSeekMs} />
             <BoardStrip lectureId={id} />
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            {/* max-h-[60vh] below md: on mobile the Stage column has no
+                bounded ancestor height (the whole page scrolls instead of
+                three nested scrollboxes — see the Column comment below), so
+                flex-1 alone can't cap this — a real 150+-segment transcript
+                rendered unbounded there, making the page 7000px+ tall.
+                md:max-h-none restores the desktop behavior, where flex-1
+                already correctly fills the bounded column. */}
+            <div className="min-h-0 max-h-[60vh] flex-1 overflow-y-auto md:max-h-none">
               <TranscriptLane lectureId={id} />
             </div>
           </div>

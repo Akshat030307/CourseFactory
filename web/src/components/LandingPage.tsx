@@ -460,7 +460,7 @@ function Distribution() {
         Turn any lecture into your smartest teacher
       </h2>
       <div className="mx-auto grid max-w-4xl gap-[var(--s-4)] md:grid-cols-2">
-        <div className="lp-card rounded-[var(--radius-lg)] p-[var(--s-4)]" style={{ border: `1px solid ${LINE}`, background: PANEL }}>
+        <div className="lp-card min-w-0 rounded-[var(--radius-lg)] p-[var(--s-4)]" style={{ border: `1px solid ${LINE}`, background: PANEL }}>
           <h3 className="mb-[var(--s-2)] text-[var(--step-0)]" style={{ color: GOLD }}>
             Telegram bot
           </h3>
@@ -474,7 +474,7 @@ function Distribution() {
             className="h-32 w-32 rounded-[var(--radius)] bg-white p-[var(--s-2)]"
           />
         </div>
-        <div className="lp-card rounded-[var(--radius-lg)] p-[var(--s-4)]" style={{ border: `1px solid ${LINE}`, background: PANEL }}>
+        <div className="lp-card min-w-0 rounded-[var(--radius-lg)] p-[var(--s-4)]" style={{ border: `1px solid ${LINE}`, background: PANEL }}>
           <h3 className="mb-[var(--s-2)] text-[var(--step-0)]" style={{ color: GOLD }}>
             MCP in Claude Desktop
           </h3>
