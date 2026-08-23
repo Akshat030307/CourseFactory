@@ -18,7 +18,9 @@ import argparse
 import json
 import os
 import re
+import sys
 import time
+import uuid
 from pathlib import Path
 
 import httpx
@@ -27,6 +29,13 @@ import psycopg2.extras
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+# See generate_questions.py's identical guard for why: Windows' console
+# codepage can't encode LLM-generated math notation, and this script prints
+# real concept labels (and, in BUILD_GRAPH_DEBUG mode, edge candidates)
+# straight from the model's own output.
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -311,12 +320,29 @@ def cypher_str(s: str) -> str:
 
 def write_graph(conn, course_id: str, concepts: list[dict], edges: list[dict]) -> None:
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM concepts WHERE course_id = %s", (course_id,))
+        # Diff-based, not blanket delete-all-then-reinsert-all: mastery.
+        # concept_id REFERENCES concepts(id) ON DELETE CASCADE, so deleting
+        # every concept on every run — even ones whose id doesn't change at
+        # all between runs — wiped every student's mastery score for the
+        # whole course on every single build_graph.py run (a later re-INSERT
+        # of the same id doesn't undo a cascade that already fired). Already
+        # a live bug on manual re-runs before Stage 17; auto-chaining this
+        # after every upload would have made it constant. Only concepts that
+        # genuinely disappeared this run get deleted; ids that persist go
+        # through ON CONFLICT DO UPDATE instead, which leaves their mastery
+        # rows untouched.
+        new_ids = [c["id"] for c in concepts]
+        cur.execute("DELETE FROM concepts WHERE course_id = %s AND id != ALL(%s::text[])", (course_id, new_ids))
         for c in concepts:
             cur.execute(
                 """
                 INSERT INTO concepts (id, course_id, label, definition, introduced_in, introduced_ms)
                 VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    label = EXCLUDED.label,
+                    definition = EXCLUDED.definition,
+                    introduced_in = EXCLUDED.introduced_in,
+                    introduced_ms = EXCLUDED.introduced_ms
                 """,
                 (c["id"], course_id, c["label"], c["definition"], c["introduced_in"], c["introduced_ms"]),
             )
@@ -362,9 +388,52 @@ def write_graph(conn, course_id: str, concepts: list[dict], edges: list[dict]) -
     conn.commit()
 
 
+def create_job(conn, lecture_id: str | None, kind: str) -> str:
+    # Same shape as ingest.py's create_job — see that file for the trace
+    # panel's expectations. lecture_id is nullable in the schema and
+    # deliberately left None when this script is run standalone by course
+    # (no single lecture "owns" a course-wide graph rebuild); Stage 17's
+    # auto-chain call passes the just-ingested lecture's id so the trace
+    # panel can follow the whole chain under one lecture.
+    job_id = str(uuid.uuid4())
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO jobs (id, lecture_id, kind, status, started_at)
+            VALUES (%s, %s, %s, 'running', now())
+            """,
+            (job_id, lecture_id, kind),
+        )
+    conn.commit()
+    return job_id
+
+
+def update_job(conn, job_id: str, *, stage: str | None = None, pct: int | None = None, message: str | None = None) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE jobs SET stage = COALESCE(%s, stage), pct = COALESCE(%s, pct), message = COALESCE(%s, message) WHERE id = %s",
+            (stage, pct, message, job_id),
+        )
+    conn.commit()
+
+
+def finish_job(conn, job_id: str, *, error: str | None = None) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE jobs
+            SET status = %s, error = %s, pct = CASE WHEN %s THEN 100 ELSE pct END, finished_at = now()
+            WHERE id = %s
+            """,
+            ("failed" if error else "done", error, error is None, job_id),
+        )
+    conn.commit()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--course-id", default="18.06")
+    parser.add_argument("--lecture-id", default=None)
     args = parser.parse_args()
 
     conn = psycopg2.connect(DATABASE_URL)
@@ -374,25 +443,42 @@ def main() -> None:
         if not lectures:
             raise SystemExit(f"no lectures found for course {args.course_id}")
 
+    job_id = create_job(conn, args.lecture_id, "build_graph")
+    print(f"job {job_id} running")
+
+    try:
         mentions: list[dict] = []
-        for lec in lectures:
-            cur.execute("SELECT start_ms, text FROM segments WHERE lecture_id = %s ORDER BY start_ms", (lec["id"],))
-            segments = cur.fetchall()
-            raw = map_lecture(segments)
-            print(f"{lec['id']}: {len(raw)} raw concept mentions")
-            for m in raw:
-                mentions.append({**m, "lecture_id": lec["id"], "sequence": lec["sequence"]})
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            for i, lec in enumerate(lectures):
+                update_job(conn, job_id, stage="map_lecture", pct=10 + round(30 * (i + 1) / len(lectures)), message=f"Mapping {lec['id']} ({i + 1}/{len(lectures)})")
+                cur.execute("SELECT start_ms, text FROM segments WHERE lecture_id = %s ORDER BY start_ms", (lec["id"],))
+                segments = cur.fetchall()
+                raw = map_lecture(segments)
+                print(f"{lec['id']}: {len(raw)} raw concept mentions")
+                for m in raw:
+                    mentions.append({**m, "lecture_id": lec["id"], "sequence": lec["sequence"]})
 
-    print(f"merging {len(mentions)} raw mentions across {len(lectures)} lectures...")
-    lecture_titles = {lec["id"]: lec["title"] for lec in lectures}
-    concepts = merge_course(args.course_id, mentions, lecture_titles)
-    print(f"merged to {len(concepts)} concepts")
+        print(f"merging {len(mentions)} raw mentions across {len(lectures)} lectures...")
+        update_job(conn, job_id, stage="merge", pct=55, message=f"Merging {len(mentions)} raw mentions across {len(lectures)} lectures")
+        lecture_titles = {lec["id"]: lec["title"] for lec in lectures}
+        concepts = merge_course(args.course_id, mentions, lecture_titles)
+        print(f"merged to {len(concepts)} concepts")
 
-    edges = link_edges(concepts)
-    print(f"linked {len(edges)} DEPENDS_ON edges")
+        update_job(conn, job_id, stage="link_edges", pct=75, message=f"Linking prerequisite edges for {len(concepts)} concepts")
+        edges = link_edges(concepts)
+        print(f"linked {len(edges)} DEPENDS_ON edges")
 
-    write_graph(conn, args.course_id, concepts, edges)
-    print(f"wrote graph for course {args.course_id}")
+        update_job(conn, job_id, stage="write_graph", pct=95, message=f"Writing {len(concepts)} concepts, {len(edges)} edges")
+        write_graph(conn, args.course_id, concepts, edges)
+        print(f"wrote graph for course {args.course_id}")
+
+        finish_job(conn, job_id)
+        print(f"job {job_id} done")
+    except Exception as e:
+        finish_job(conn, job_id, error=str(e))
+        conn.close()
+        raise
+
     conn.close()
 
 

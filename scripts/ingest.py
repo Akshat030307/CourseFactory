@@ -10,6 +10,7 @@ import base64
 import os
 import shutil
 import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -35,7 +36,21 @@ MEDIA_ROOT = Path(__file__).resolve().parents[1] / "media"
 # LECTURES_DIR (that one's not importable from here: it's a FastAPI route
 # module, this is a standalone CLI script run as its own subprocess).
 LECTURES_DIR = Path(__file__).resolve().parents[1] / "lectures"
+# Stage 17 — auto-chaining. build_graph.py/generate_questions.py run as
+# their own subprocesses (not imported) after a successful ingest, same
+# "small independent scripts" convention this repo already uses elsewhere.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+BUILD_GRAPH_SCRIPT = REPO_ROOT / "scripts" / "build_graph.py"
+GENERATE_QUESTIONS_SCRIPT = REPO_ROOT / "scripts" / "generate_questions.py"
 DATABASE_URL = os.environ["DATABASE_URL"]
+# Optional. Empty by default — local dev works without it (a residential IP
+# doesn't trip YouTube's bot check). Found the hard way that a real VPS's
+# datacenter IP does, near-immediately, regardless of video: yt-dlp fails
+# every download with "Sign in to confirm you're not a bot," a real
+# anti-bot challenge, not a bug in this code. A Netscape-format cookies.txt
+# from a real logged-in YouTube session is yt-dlp's own documented fix —
+# see YOUTUBE_COOKIES_FILE in .env.example for how this gets populated.
+YOUTUBE_COOKIES_FILE = os.environ.get("YOUTUBE_COOKIES_FILE", "")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL_ASR = os.environ.get("GROQ_MODEL_ASR", "whisper-large-v3-turbo")
 # llama-4-scout was deprecated by Groq on 2026-06-17 (404s) — found running B3.
@@ -81,6 +96,8 @@ def download_youtube(url: str, lecture_id: str) -> Path:
         "quiet": True,
         "noprogress": True,
     }
+    if YOUTUBE_COOKIES_FILE and Path(YOUTUBE_COOKIES_FILE).exists():
+        opts["cookiefile"] = YOUTUBE_COOKIES_FILE
     with yt_dlp.YoutubeDL(opts) as ydl:
         ydl.download([url])
     return dest
@@ -458,6 +475,20 @@ def set_duration(conn, lecture_id: str, duration_ms: int) -> None:
     conn.commit()
 
 
+def mark_lecture_failed(conn, lecture_id: str) -> None:
+    """The pipeline's other status writes (set_duration, write_segments,
+    write_frames, the final 'ready') all happen on success paths — nothing
+    ever wrote 'failed' to the lecture itself. jobs.status/error already
+    captured a real failure correctly, but the LECTURE stayed stuck showing
+    whatever status it last reached (often still 'transcribing'), which
+    reads as "still working" rather than "this needs attention." Found
+    live: a real YouTube download failure left two lectures looking like
+    they were quietly still processing."""
+    with conn.cursor() as cur:
+        cur.execute("UPDATE lectures SET status = 'failed' WHERE id = %s", (lecture_id,))
+    conn.commit()
+
+
 def create_job(conn, lecture_id: str, kind: str) -> str:
     job_id = str(uuid.uuid4())
     with conn.cursor() as cur:
@@ -730,10 +761,34 @@ def main() -> None:
         print(f"job {job_id} done")
     except Exception as e:
         finish_job(conn, job_id, error=str(e))
+        mark_lecture_failed(conn, args.lecture_id)
         conn.close()
         raise
 
     conn.close()
+
+    # Stage 17 — auto-chain the concept graph + quiz questions so an
+    # instructor never has to know these scripts exist. Deliberately
+    # outside the try/except above: the lecture is already fully ready
+    # (playable, searchable, transcribed) at this point, so a failure here
+    # must never call mark_lecture_failed() on it — it's a course-wide
+    # refresh that failed, not this lecture's ingest.
+    try:
+        subprocess.run(
+            [sys.executable, str(BUILD_GRAPH_SCRIPT), "--course-id", args.course_id, "--lecture-id", args.lecture_id],
+            check=True, cwd=REPO_ROOT,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"build_graph failed (lecture is still ready, just not freshly graphed): {e}")
+        return
+
+    try:
+        subprocess.run(
+            [sys.executable, str(GENERATE_QUESTIONS_SCRIPT), "--course-id", args.course_id, "--lecture-id", args.lecture_id],
+            check=True, cwd=REPO_ROOT,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"generate_questions failed: {e}")
 
 
 if __name__ == "__main__":

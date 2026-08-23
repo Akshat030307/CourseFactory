@@ -14,7 +14,9 @@ flips that; X4 (review queue, Stage 9) is what will.
 import argparse
 import json
 import os
+import sys
 import time
+import uuid
 from pathlib import Path
 
 import httpx
@@ -23,6 +25,15 @@ import psycopg2.extras
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+# Windows' console defaults to the system codepage (cp1252 here), which
+# can't encode LLM-generated math notation (e.g. U+2212 MINUS SIGN) that
+# routinely shows up in this course's real question prompts — found
+# crashing a real run mid-loop. The auto-chain (ingest.py) runs this as a
+# subprocess with inherited stdout, so this isn't just a console cosmetic:
+# an uncaught crash here on a print() alone would kill the whole chain.
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -90,9 +101,48 @@ def generate_question(concept: dict, transcript_excerpt: str) -> dict:
     return call_nano(EXAMINER_SYSTEM, user)
 
 
+def create_job(conn, lecture_id: str | None, kind: str) -> str:
+    # Same shape as build_graph.py's create_job — see that file for why
+    # lecture_id is nullable and left None for a standalone by-course run.
+    job_id = str(uuid.uuid4())
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO jobs (id, lecture_id, kind, status, started_at)
+            VALUES (%s, %s, %s, 'running', now())
+            """,
+            (job_id, lecture_id, kind),
+        )
+    conn.commit()
+    return job_id
+
+
+def update_job(conn, job_id: str, *, stage: str | None = None, pct: int | None = None, message: str | None = None) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE jobs SET stage = COALESCE(%s, stage), pct = COALESCE(%s, pct), message = COALESCE(%s, message) WHERE id = %s",
+            (stage, pct, message, job_id),
+        )
+    conn.commit()
+
+
+def finish_job(conn, job_id: str, *, error: str | None = None) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE jobs
+            SET status = %s, error = %s, pct = CASE WHEN %s THEN 100 ELSE pct END, finished_at = now()
+            WHERE id = %s
+            """,
+            ("failed" if error else "done", error, error is None, job_id),
+        )
+    conn.commit()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--course-id", default="18.06")
+    parser.add_argument("--lecture-id", default=None)
     args = parser.parse_args()
 
     conn = psycopg2.connect(DATABASE_URL)
@@ -105,49 +155,78 @@ def main() -> None:
         if not concepts:
             raise SystemExit(f"no concepts found for course {args.course_id} — run scripts/build_graph.py first")
 
+    job_id = create_job(conn, args.lecture_id, "generate_questions")
+    print(f"job {job_id} running")
+
+    try:
         written = 0
-        for concept in concepts:
-            lo, hi = concept["introduced_ms"] - CONTEXT_WINDOW_MS, concept["introduced_ms"] + CONTEXT_WINDOW_MS
-            cur.execute(
-                "SELECT text FROM segments WHERE lecture_id = %s AND start_ms BETWEEN %s AND %s ORDER BY start_ms",
-                (concept["introduced_in"], lo, hi),
-            )
-            excerpt = " ".join(r["text"] for r in cur.fetchall())
+        skipped_approved = 0
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            update_job(conn, job_id, stage="generating_questions", pct=10, message=f"Generating questions for {len(concepts)} concepts")
+            for concept in concepts:
+                # Guard first, before paying for a nano call: an approved
+                # question means a real instructor signed off on it, and may
+                # already have real attempts/schedule rows a student earned
+                # by answering it — both REFERENCES questions(id) ON DELETE
+                # CASCADE. The delete+reinsert below would silently both
+                # revert the approval AND permanently destroy that student's
+                # history for it. Skip regenerating anything already
+                # approved, full stop.
+                qid = f"q_{concept['id']}"
+                cur.execute("SELECT approved FROM questions WHERE id = %s", (qid,))
+                existing = cur.fetchone()
+                if existing and existing["approved"]:
+                    skipped_approved += 1
+                    print(f"skipped {qid}: already approved, not regenerating")
+                    continue
 
-            try:
-                q = generate_question(concept, excerpt)
-            except Exception as e:
-                print(f"skipped {concept['id']}: {e}")
-                continue
+                lo, hi = concept["introduced_ms"] - CONTEXT_WINDOW_MS, concept["introduced_ms"] + CONTEXT_WINDOW_MS
+                cur.execute(
+                    "SELECT text FROM segments WHERE lecture_id = %s AND start_ms BETWEEN %s AND %s ORDER BY start_ms",
+                    (concept["introduced_in"], lo, hi),
+                )
+                excerpt = " ".join(r["text"] for r in cur.fetchall())
 
-            option_ids = {o["id"] for o in q["options"]}
-            if len(q["options"]) != 4 or q["correct_option_id"] not in option_ids:
-                print(f"skipped {concept['id']}: malformed options from model")
-                continue
+                try:
+                    q = generate_question(concept, excerpt)
+                except Exception as e:
+                    print(f"skipped {concept['id']}: {e}")
+                    continue
 
-            qid = f"q_{concept['id']}"
-            cur.execute("DELETE FROM questions WHERE id = %s", (qid,))
-            cur.execute(
-                """
-                INSERT INTO questions (id, lecture_id, concept_id, prompt, options, correct_option_id, explanation, source_timestamp_ms, approved)
-                VALUES (%s, %s, %s, %s, %s::jsonb, %s, %s, %s, false)
-                """,
-                (
-                    qid,
-                    concept["introduced_in"],
-                    concept["id"],
-                    q["prompt"],
-                    json.dumps(q["options"]),
-                    q["correct_option_id"],
-                    q.get("explanation", ""),
-                    concept["introduced_ms"],
-                ),
-            )
-            written += 1
-            print(f"{qid} ({concept['label']}): {q['prompt'][:70]}")
+                option_ids = {o["id"] for o in q["options"]}
+                if len(q["options"]) != 4 or q["correct_option_id"] not in option_ids:
+                    print(f"skipped {concept['id']}: malformed options from model")
+                    continue
 
-    conn.commit()
-    print(f"wrote {written}/{len(concepts)} questions for course {args.course_id}")
+                cur.execute("DELETE FROM questions WHERE id = %s", (qid,))
+                cur.execute(
+                    """
+                    INSERT INTO questions (id, lecture_id, concept_id, prompt, options, correct_option_id, explanation, source_timestamp_ms, approved)
+                    VALUES (%s, %s, %s, %s, %s::jsonb, %s, %s, %s, false)
+                    """,
+                    (
+                        qid,
+                        concept["introduced_in"],
+                        concept["id"],
+                        q["prompt"],
+                        json.dumps(q["options"]),
+                        q["correct_option_id"],
+                        q.get("explanation", ""),
+                        concept["introduced_ms"],
+                    ),
+                )
+                written += 1
+                print(f"{qid} ({concept['label']}): {q['prompt'][:70]}")
+
+        conn.commit()
+        print(f"wrote {written}/{len(concepts)} questions for course {args.course_id} ({skipped_approved} already approved, left untouched)")
+        finish_job(conn, job_id)
+        print(f"job {job_id} done")
+    except Exception as e:
+        finish_job(conn, job_id, error=str(e))
+        conn.close()
+        raise
+
     conn.close()
 
 
