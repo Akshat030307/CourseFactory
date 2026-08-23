@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDueQuestions, useSubmitAttempt, type AttemptResult, type DueQuestion } from '../api/quiz';
+import { useEffectiveStudentId } from '../students/useEffectiveStudentId';
 import { LogoutButton } from './AppShell';
 import { RemediationCard } from './RemediationCard';
 
@@ -9,10 +10,9 @@ import { RemediationCard } from './RemediationCard';
 // simpler standalone page (no video player, no board strip): a review
 // session isn't tied to watching one lecture, so it doesn't borrow
 // AppShell's three-column layout.
-const DEMO_STUDENT_ID = 's1';
-
 export function DrillPage() {
-  const { data: due, isPending, isError } = useDueQuestions(DEMO_STUDENT_ID);
+  const studentId = useEffectiveStudentId();
+  const { data: due, isPending, isError } = useDueQuestions(studentId);
   const submitAttempt = useSubmitAttempt();
   const [current, setCurrent] = useState<DueQuestion | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export function DrillPage() {
   function onSubmit(questionId: string) {
     if (!selected) return;
     submitAttempt.mutate(
-      { questionId, chosenOptionId: selected, studentId: DEMO_STUDENT_ID },
+      { questionId, chosenOptionId: selected, studentId },
       { onSuccess: (data) => setResult(data) },
     );
   }

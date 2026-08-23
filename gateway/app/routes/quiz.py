@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from app.config import DEMO_STUDENT_ID
+from app.auth import resolve_student_id
 from app.queries import load
 from app.routes.remediation import RemediationResponse, compute_remediation
 
@@ -37,7 +37,10 @@ class QuizQuestion(BaseModel):
 class AttemptRequest(BaseModel):
     question_id: str
     chosen_option_id: str
-    student_id: str = DEMO_STUDENT_ID
+    # Advisory only for a student session (their own session id always
+    # wins server-side — see resolve_student_id); an instructor/service
+    # caller can specify who they're acting on behalf of.
+    student_id: str | None = None
 
 
 class AttemptResponse(BaseModel):
@@ -77,6 +80,7 @@ async def get_quiz(request: Request, lecture_id: str, include_unapproved: bool =
 
 @router.post("/attempts")
 async def post_attempt(request: Request, body: AttemptRequest) -> AttemptResponse:
+    student_id = resolve_student_id(request.state.identity, body.student_id)
     async with request.app.state.pool.acquire() as conn:
         question = await conn.fetchrow(load("get_question.sql"), body.question_id)
         if question is None:
@@ -84,12 +88,12 @@ async def post_attempt(request: Request, body: AttemptRequest) -> AttemptRespons
 
         correct = body.chosen_option_id == question["correct_option_id"]
 
-        await conn.execute(load("insert_attempt.sql"), body.student_id, body.question_id, correct)
+        await conn.execute(load("insert_attempt.sql"), student_id, body.question_id, correct)
 
         if question["concept_id"] is not None:
-            await conn.fetchval(load("upsert_mastery.sql"), body.student_id, question["concept_id"], 1.0 if correct else 0.0)
+            await conn.fetchval(load("upsert_mastery.sql"), student_id, question["concept_id"], 1.0 if correct else 0.0)
 
-        prior = await conn.fetchrow(load("get_schedule.sql"), body.student_id, body.question_id)
+        prior = await conn.fetchrow(load("get_schedule.sql"), student_id, body.question_id)
         prior_interval = prior["interval_days"] if prior else 1
         prior_ease = prior["ease"] if prior else 2.5
         if correct:
@@ -98,23 +102,24 @@ async def post_attempt(request: Request, body: AttemptRequest) -> AttemptRespons
         else:
             new_ease = max(prior_ease - EASE_STEP * 2, EASE_MIN)
             new_interval = 1
-        await conn.execute(load("upsert_schedule.sql"), body.student_id, body.question_id, new_interval, new_ease)
+        await conn.execute(load("upsert_schedule.sql"), student_id, body.question_id, new_interval, new_ease)
 
         # Only worth the extra traversal on a wrong answer — a correct one
         # has nothing to remediate. Reuses R1's exact query (graph_queries.py
         # / remediation.py), not a second implementation of the same logic.
-        remediation = None if correct else await compute_remediation(conn, body.question_id, body.student_id)
+        remediation = None if correct else await compute_remediation(conn, body.question_id, student_id)
 
     return AttemptResponse(correct=correct, remediation=remediation)
 
 
 @router.get("/schedule")
-async def get_schedule(request: Request, student_id: str = DEMO_STUDENT_ID) -> list[DueQuestion]:
+async def get_schedule(request: Request, student_id: str | None = None) -> list[DueQuestion]:
     """Due reviews (SM-2-lite, D3). Powers both the Telegram bot and the
     in-app drill — same query, same due set, nothing bot-specific baked in
     here."""
+    effective_student_id = resolve_student_id(request.state.identity, student_id)
     async with request.app.state.pool.acquire() as conn:
-        rows = await conn.fetch(load("schedule_due.sql"), student_id)
+        rows = await conn.fetch(load("schedule_due.sql"), effective_student_id)
     return [
         DueQuestion(
             question_id=row["question_id"],

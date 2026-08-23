@@ -2,7 +2,9 @@
 
 Base: `/api/v1`. All times are **integer milliseconds**. Errors use RFC 7807 (`application/problem+json`).
 
-No auth. Local-only build with one hardcoded student and one instructor. Don't build around its absence.
+Auth: httpOnly JWT cookie (`POST /auth/login`), or `Authorization: Bearer <SERVICE_API_KEY>` for trusted same-deployment scripts (the Telegram bot, the MCP server). The session carries a `role` (`instructor` | `student`) and, for a student session, which `student_id` they are — see `gateway/app/auth.py`.
+
+`student_id` params below (`/attempts`, `/schedule`, `/remediation`, `/lectures`, `/courses/{id}/graph`) are **server-enforced, not client-trusted**: a student session's own id always wins regardless of what's sent, so it's advisory only for that role. An instructor session (or the service bearer token) can specify any `student_id` explicitly — that's how the instructor's student switcher and the Telegram bot's own `telegram_id`→`student_id` lookup work. Omit it entirely and the server falls back to the single demo student (`DEMO_STUDENT_ID`, default `s1`).
 
 ---
 
@@ -182,6 +184,38 @@ Bulk variant: `POST /review-queue/approve` with `{ "concept_id": "c_lu" }`.
 | `cancel` | `{ job_id }` |
 
 `node.*` events depend on whether RocketRide's WebSocket surfaces per-node execution. **Unverified** — if it doesn't, the gateway emits equivalent events at pipeline-invocation boundaries instead. The client contract stays the same either way.
+
+---
+
+## Students & waitlist
+
+No self-service registration — accounts are admin-provisioned only. See CLAUDE.md's "Things not to do."
+
+### `POST /waitlist`
+Public. `{ "name", "email", "message"? }`. Dedupes on `email`.
+
+### `GET /waitlist`
+Instructor-only. Pending + already-provisioned signups.
+
+### `POST /waitlist/{id}/invite`
+Instructor-only. Creates a real student account (username/password) for that signup and returns the plaintext password **once**:
+```json
+{ "username": "jsmith", "password": "kX9…", "name": "Jane Smith" }
+```
+Never stored, never retrievable again — the admin copies it out and hands it off manually. 404s if already invited (idempotency guard, not a retry-safe "get me the password again" endpoint).
+
+### `GET /students`
+Instructor-only. Powers the student switcher.
+```json
+[{ "id": "jsmith", "username": "jsmith", "name": "Jane Smith", "has_telegram": true, "created_at": "..." }]
+```
+
+### `POST /telegram/link-code`
+Any authenticated session (student for themselves, or instructor on a selected student's behalf). Generates a 10-minute one-time code:
+```json
+{ "code": "7F3K9QRT", "expires_at": "..." }
+```
+Send `/start <code>` to the Telegram bot to link that chat to the account — see `scripts/telegram_bot.py`.
 
 ---
 

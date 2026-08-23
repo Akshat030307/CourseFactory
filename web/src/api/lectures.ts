@@ -31,16 +31,21 @@ export function useCourses() {
   });
 }
 
-async function fetchLectures(): Promise<Lecture[]> {
-  const res = await apiFetch('/api/v1/lectures');
+async function fetchLectures(studentId?: string): Promise<Lecture[]> {
+  const qs = studentId ? `?student_id=${encodeURIComponent(studentId)}` : '';
+  const res = await apiFetch(`/api/v1/lectures${qs}`);
   if (!res.ok) throw new Error(`Failed to fetch lectures: ${res.status}`);
   return res.json();
 }
 
-export function useLectures() {
+// studentId is optional — callers that only need lecture id/title/video_url
+// (not the per-student `mastery` field) can omit it and get the server's
+// default. Included in the query key so switching students (the instructor
+// switcher) actually refetches instead of serving a stale student's cache.
+export function useLectures(studentId?: string) {
   return useQuery({
-    queryKey: ['lectures'],
-    queryFn: fetchLectures,
+    queryKey: ['lectures', studentId ?? null],
+    queryFn: () => fetchLectures(studentId),
     staleTime: Infinity,
   });
 }

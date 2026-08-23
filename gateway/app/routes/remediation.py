@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from app.config import DEMO_STUDENT_ID
+from app.auth import resolve_student_id
 from app.graph_queries import get_backward_prerequisites, get_revisited_in
 from app.queries import load
 
@@ -120,14 +120,15 @@ async def compute_remediation(conn, question_id: str, student_id: str) -> Remedi
 
 
 @router.get("/remediation")
-async def get_remediation(request: Request, question_id: str, student_id: str = DEMO_STUDENT_ID) -> RemediationResponse:
+async def get_remediation(request: Request, question_id: str, student_id: str | None = None) -> RemediationResponse:
     """The differentiator (docs/ARCHITECTURE.md): given a failed question,
     walk DEPENDS_ON backward breadth-first (depth cap 3) for the nearest
     prerequisite introduced in an earlier lecture that the student hasn't
     shown mastery of. Falls back to REVISITED_IN on the concept itself if
     nothing qualifies. Pure graph traversal — no LLM, no RocketRide."""
+    effective_student_id = resolve_student_id(request.state.identity, student_id)
     async with request.app.state.pool.acquire() as conn:
-        result = await compute_remediation(conn, question_id, student_id)
+        result = await compute_remediation(conn, question_id, effective_student_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"No question with id {question_id!r}.")
     return result

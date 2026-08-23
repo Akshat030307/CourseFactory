@@ -3,20 +3,22 @@ works from localhost with no tunnel, per CLAUDE.md's demo integrity notes).
 
     python scripts/telegram_bot.py
 
-Registration (`/start`) links this chat's Telegram user to the demo
-student (`DEMO_STUDENT_ID` — CLAUDE.md: "one hardcoded student"). `/due`
-serves due reviews from `schedule` (D3); answering calls the gateway's own
-`POST /attempts` — same mastery/schedule/remediation logic the SPA quiz
-uses, not a second implementation of it. A wrong answer returns the
-remediation link exactly like the in-app RemediationCard does, just as
-text instead of a UI.
+Stage 15: registration (`/start <code>`) links this chat's Telegram user to
+a real student account via a short-lived one-time code the student
+generates from the logged-in web app (POST /telegram/link-code) — not the
+old behavior where every `/start`, from anyone, silently re-linked the
+SAME single demo student ("last /start wins"). `/due` serves due reviews
+from `schedule` (D3); answering calls the gateway's own `POST /attempts` —
+same mastery/schedule/remediation logic the SPA quiz uses, not a second
+implementation of it. A wrong answer returns the remediation link exactly
+like the in-app RemediationCard does, just as text instead of a UI.
 
 Direct Postgres access here is limited to the telegram_id<->student_id
-mapping, which has no gateway endpoint of its own (bot-specific, not part
-of the SPA's API surface) — everything quiz/schedule/attempt-shaped goes
-through the gateway's REST API, reusing its already-tested logic rather
-than a third reimplementation (the MCP server, scripts/mcp_server.py,
-makes the same choice for the same reason).
+mapping and consuming link codes, neither of which has a gateway endpoint
+of its own for this bot-specific use — everything quiz/schedule/attempt-
+shaped goes through the gateway's REST API, reusing its already-tested
+logic rather than a third reimplementation (the MCP server,
+scripts/mcp_server.py, makes the same choice for the same reason).
 """
 
 import logging
@@ -37,7 +39,6 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://localhost:8000")
 PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "http://localhost:5173")
-DEMO_STUDENT_ID = os.environ.get("DEMO_STUDENT_ID", "s1")
 # Stage 13: the gateway now requires auth on every route (VPS deployment —
 # see gateway/app/auth_middleware.py). This bot has no login flow of its
 # own and shouldn't need one — it's a trusted, same-deployment caller, so
@@ -62,22 +63,47 @@ async def _student_id_for(context: ContextTypes.DEFAULT_TYPE, telegram_id: str) 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     telegram_id = str(update.effective_user.id)
+
+    if not context.args:
+        await update.message.reply_text(
+            "Log into Course Factory on the web, then use “Link Telegram” to get a one-time "
+            "code — send it here as /start <code>."
+        )
+        return
+
+    code = context.args[0].strip().upper()
     pool = await _pool(context)
     async with pool.acquire() as conn:
-        # One hardcoded student (CLAUDE.md) — /start links *this* chat to
-        # it. In a live demo with multiple judges scanning the QR, the last
-        # /start wins; that's the honest shape of a single-student build,
-        # not a bug to work around here.
-        await conn.execute(
+        student_id = await conn.fetchval(
             """
-            INSERT INTO students (id, telegram_id) VALUES ($1, $2)
-            ON CONFLICT (id) DO UPDATE SET telegram_id = $2
+            UPDATE telegram_link_codes
+            SET consumed_at = now()
+            WHERE code = $1 AND consumed_at IS NULL AND expires_at > now()
+            RETURNING student_id
             """,
-            DEMO_STUDENT_ID,
-            telegram_id,
+            code,
         )
+        if student_id is None:
+            state = await conn.fetchrow(
+                "SELECT consumed_at, expires_at FROM telegram_link_codes WHERE code = $1", code
+            )
+            if state is None:
+                await update.message.reply_text("That code doesn't look right — double-check it and try again.")
+            elif state["consumed_at"] is not None:
+                await update.message.reply_text("That code's already been used — get a fresh one from the app.")
+            else:
+                await update.message.reply_text("That code has expired — get a fresh one from the app.")
+            return
+
+        async with conn.transaction():
+            # telegram_id is UNIQUE — if this chat previously linked to a
+            # different student (or the pre-Stage-15 demo student), free it
+            # up before claiming it for the newly-linked account.
+            await conn.execute("UPDATE students SET telegram_id = NULL WHERE telegram_id = $1 AND id != $2", telegram_id, student_id)
+            await conn.execute("UPDATE students SET telegram_id = $1 WHERE id = $2", telegram_id, student_id)
+
     await update.message.reply_text(
-        "You're registered for Course Factory review reminders.\nSend /due to see what's due for review."
+        "You're linked. Send /due to see what's due for review."
     )
 
 

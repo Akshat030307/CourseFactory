@@ -3,6 +3,7 @@ import ForceGraph2D from 'react-force-graph-2d';
 import { useGraph, type GraphEdge, type GraphNode } from '../api/graph';
 import { useLectures } from '../api/lectures';
 import { navigate } from '../nav/navigate';
+import { useEffectiveStudentId } from '../students/useEffectiveStudentId';
 
 // Single demo course fixture — matches SearchPanel's COURSE_ID.
 const COURSE_ID = '18.06';
@@ -41,8 +42,9 @@ function masteryColor(mastery: number | null, fallback: string): string {
 }
 
 export function GraphPanel() {
-  const { data: graph, isPending, isError } = useGraph(COURSE_ID);
-  const { data: lectures } = useLectures();
+  const studentId = useEffectiveStudentId();
+  const { data: graph, isPending, isError } = useGraph(COURSE_ID, studentId);
+  const { data: lectures } = useLectures(studentId);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 320, height: 360 });

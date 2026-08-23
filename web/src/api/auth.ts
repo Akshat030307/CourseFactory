@@ -4,6 +4,8 @@ import { apiFetch } from './http';
 export interface Me {
   authenticated: boolean;
   username: string | null;
+  role: 'instructor' | 'student' | null;
+  student_id: string | null;
 }
 
 async function fetchMe(): Promise<Me> {
@@ -53,7 +55,7 @@ export function useLogout() {
       await apiFetch('/api/v1/auth/logout', { method: 'POST' });
     },
     onSuccess: () => {
-      queryClient.setQueryData(['auth', 'me'], { authenticated: false, username: null });
+      queryClient.setQueryData(['auth', 'me'], { authenticated: false, username: null, role: null, student_id: null });
       window.location.href = '/login';
     },
   });

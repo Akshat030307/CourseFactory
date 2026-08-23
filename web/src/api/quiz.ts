@@ -62,15 +62,16 @@ export function useQuiz(lectureId: string) {
   });
 }
 
-async function fetchDueQuestions(studentId: string): Promise<DueQuestion[]> {
-  const res = await apiFetch(`/api/v1/schedule?student_id=${studentId}`);
+async function fetchDueQuestions(studentId?: string): Promise<DueQuestion[]> {
+  const qs = studentId ? `?student_id=${encodeURIComponent(studentId)}` : '';
+  const res = await apiFetch(`/api/v1/schedule${qs}`);
   if (!res.ok) throw new Error(`Failed to fetch schedule: ${res.status}`);
   return res.json();
 }
 
-export function useDueQuestions(studentId: string) {
+export function useDueQuestions(studentId?: string) {
   return useQuery({
-    queryKey: ['schedule', studentId],
+    queryKey: ['schedule', studentId ?? null],
     queryFn: () => fetchDueQuestions(studentId),
   });
 }
@@ -78,7 +79,10 @@ export function useDueQuestions(studentId: string) {
 interface AttemptArgs {
   questionId: string;
   chosenOptionId: string;
-  studentId: string;
+  // Advisory only — see gateway/app/auth.py's resolve_student_id. A
+  // student session's own id always wins server-side regardless of what's
+  // sent here.
+  studentId?: string;
 }
 
 async function submitAttempt({ questionId, chosenOptionId, studentId }: AttemptArgs): Promise<AttemptResult> {

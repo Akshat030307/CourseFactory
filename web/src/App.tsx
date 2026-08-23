@@ -4,6 +4,7 @@ import { DrillPage } from './components/DrillPage';
 import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { RequireAuth } from './components/RequireAuth';
+import { RequireRole } from './components/RequireRole';
 import { ReviewQueuePage } from './components/ReviewQueuePage';
 import { SignupPage } from './components/SignupPage';
 import { UploadPage } from './components/UploadPage';
@@ -39,35 +40,40 @@ function App() {
             </RequireAuth>
           }
         />
-        {/* X4 (Stage 9): instructor-facing — same login gate as everything
-            else now (Stage 13); there's no separate instructor account. */}
+        {/* X4 (Stage 9): instructor-facing. Stage 15 added real student
+            accounts alongside the one instructor account, so this is now
+            RequireRole (not just RequireAuth) — a student session is
+            authenticated but not authorized here, same as the gateway's
+            own require_instructor check. */}
         <Route
           path="/review"
           element={
-            <RequireAuth>
+            <RequireRole role="instructor">
               <ReviewQueuePage />
-            </RequireAuth>
+            </RequireRole>
           }
         />
         {/* Stage 12: the real "an actual person can use this" upload flow —
-            not just the four fixtures ingested from the CLI. */}
+            not just the four fixtures ingested from the CLI. Instructor-only
+            (Stage 15) — course content management, not a student surface. */}
         <Route
           path="/upload"
           element={
-            <RequireAuth>
+            <RequireRole role="instructor">
               <UploadPage />
-            </RequireAuth>
+            </RequireRole>
           }
         />
         {/* Stage 14: still no self-service registration (see CLAUDE.md) —
             /signup only ever writes to the waitlist table. /waitlist is
-            the admin-only view of it, gated like everything else above. */}
+            the admin-only view of it (Stage 15: instructor-only, since it's
+            also where real student accounts get created). */}
         <Route
           path="/waitlist"
           element={
-            <RequireAuth>
+            <RequireRole role="instructor">
               <WaitlistPage />
-            </RequireAuth>
+            </RequireRole>
           }
         />
         <Route path="/signup" element={<SignupPage />} />

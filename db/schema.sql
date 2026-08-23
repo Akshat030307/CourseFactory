@@ -130,10 +130,19 @@ CREATE TABLE questions (
 );
 CREATE INDEX questions_review ON questions (lecture_id) WHERE approved = false;
 
+-- Stage 15 (multi-student). username/password_hash are nullable — the demo
+-- student (s1) and any not-yet-linked row stay NULL; only accounts created
+-- via the waitlist "Create account" flow (gateway/app/routes/waitlist.py)
+-- get real credentials. Still no self-service registration: this table is
+-- never written to by an unauthenticated caller.
 CREATE TABLE students (
-    id           TEXT PRIMARY KEY,
-    telegram_id  TEXT UNIQUE,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    id             TEXT PRIMARY KEY,
+    telegram_id    TEXT UNIQUE,
+    username       TEXT UNIQUE,
+    password_hash  TEXT,
+    name           TEXT,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK ((username IS NULL) = (password_hash IS NULL))
 );
 
 CREATE TABLE attempts (
@@ -164,6 +173,19 @@ CREATE TABLE schedule (
     PRIMARY KEY (student_id, question_id)
 );
 CREATE INDEX schedule_due ON schedule (student_id, due_at);
+
+-- One-time codes a logged-in student generates from the web app and sends
+-- to the Telegram bot (/start <code>) to link that chat to their real
+-- account — replaces the old "last /start wins onto the one demo student"
+-- behavior. Expired-but-unconsumed rows are kept (not deleted) so the bot
+-- can tell "expired" apart from "never existed" in its reply.
+CREATE TABLE telegram_link_codes (
+    code         TEXT PRIMARY KEY,
+    student_id   TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    expires_at   TIMESTAMPTZ NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    consumed_at  TIMESTAMPTZ
+);
 
 -- ----------------------------------------------------------- contradictions
 

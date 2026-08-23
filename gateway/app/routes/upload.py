@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
+from app.auth import require_instructor
 from app.queries import load
 
 router = APIRouter()
@@ -41,6 +42,7 @@ def slugify(text: str) -> str:
 
 @router.get("/courses")
 async def list_courses(request: Request) -> list[Course]:
+    require_instructor(request.state.identity)
     async with request.app.state.pool.acquire() as conn:
         rows = await conn.fetch(load("courses.sql"))
     return [Course(**dict(row)) for row in rows]
@@ -54,6 +56,7 @@ async def upload_lecture(
     course_id: str | None = Form(None),
     new_course_title: str | None = Form(None),
 ) -> UploadResponse:
+    require_instructor(request.state.identity)
     if not title.strip():
         raise HTTPException(400, "Title is required.")
     if not course_id and not new_course_title:

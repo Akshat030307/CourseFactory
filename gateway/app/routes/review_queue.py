@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from app.auth import require_instructor
 from app.queries import load
 from app.routes.quiz import QuizOption
 
@@ -33,6 +34,7 @@ class ApproveByConceptRequest(BaseModel):
 
 @router.get("/review-queue")
 async def get_review_queue(request: Request, course_id: str) -> list[ReviewItem]:
+    require_instructor(request.state.identity)
     async with request.app.state.pool.acquire() as conn:
         rows = await conn.fetch(load("review_queue.sql"), course_id)
     return [
@@ -57,6 +59,7 @@ async def get_review_queue(request: Request, course_id: str) -> list[ReviewItem]
 
 @router.post("/questions/{question_id}/approve")
 async def approve_question(request: Request, question_id: str) -> dict:
+    require_instructor(request.state.identity)
     async with request.app.state.pool.acquire() as conn:
         result = await conn.execute(load("approve_question.sql"), question_id, INSTRUCTOR_ID)
     if result == "UPDATE 0":
@@ -66,6 +69,7 @@ async def approve_question(request: Request, question_id: str) -> dict:
 
 @router.post("/questions/{question_id}/reject")
 async def reject_question(request: Request, question_id: str) -> dict:
+    require_instructor(request.state.identity)
     async with request.app.state.pool.acquire() as conn:
         result = await conn.execute(load("reject_question.sql"), question_id)
     if result == "DELETE 0":
@@ -75,6 +79,7 @@ async def reject_question(request: Request, question_id: str) -> dict:
 
 @router.post("/review-queue/approve")
 async def approve_by_concept(request: Request, body: ApproveByConceptRequest) -> dict:
+    require_instructor(request.state.identity)
     async with request.app.state.pool.acquire() as conn:
         rows = await conn.fetch(load("approve_questions_by_concept.sql"), body.concept_id, INSTRUCTOR_ID)
     return {"concept_id": body.concept_id, "approved_ids": [r["id"] for r in rows]}

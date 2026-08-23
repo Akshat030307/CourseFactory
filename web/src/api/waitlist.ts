@@ -43,12 +43,26 @@ export function useWaitlist() {
   return useQuery({ queryKey: ['waitlist'], queryFn: fetchWaitlist });
 }
 
-export function useMarkInvited() {
+export interface CreatedAccount {
+  username: string;
+  password: string;
+  name: string;
+}
+
+// Same endpoint as before, new behavior (Stage 15): generates real
+// credentials instead of just flipping a flag. The response is the ONLY
+// place the plaintext password ever exists — WaitlistPage.tsx shows it
+// once and never persists it.
+export function useCreateAccount() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: number): Promise<CreatedAccount> => {
       const res = await apiFetch(`/api/v1/waitlist/${id}/invite`, { method: 'POST' });
-      if (!res.ok) throw new Error(`Failed to mark invited: ${res.status}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.detail ?? `Failed to create account: ${res.status}`);
+      }
+      return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['waitlist'] }),
   });

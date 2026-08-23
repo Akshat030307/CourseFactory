@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from app.config import DEMO_STUDENT_ID
+from app.auth import resolve_student_id
 from app.queries import load
 
 router = APIRouter()
@@ -43,9 +43,10 @@ class Track(BaseModel):
 
 
 @router.get("/lectures")
-async def list_lectures(request: Request) -> list[Lecture]:
+async def list_lectures(request: Request, student_id: str | None = None) -> list[Lecture]:
+    effective_student_id = resolve_student_id(request.state.identity, student_id)
     async with request.app.state.pool.acquire() as conn:
-        rows = await conn.fetch(load("lectures.sql"), DEMO_STUDENT_ID)
+        rows = await conn.fetch(load("lectures.sql"), effective_student_id)
     return [Lecture(**dict(row)) for row in rows]
 
 

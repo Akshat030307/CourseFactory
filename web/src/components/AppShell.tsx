@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { BoardStrip } from './BoardStrip';
 import { ContradictionsPanel } from './ContradictionsPanel';
 import { GraphPanel } from './GraphPanel';
+import { LinkTelegramCard } from './LinkTelegramCard';
 import { QuizPanel } from './QuizPanel';
 import { ReturnPill } from './ReturnPill';
 import { SearchPanel } from './SearchPanel';
@@ -11,11 +12,13 @@ import { SplitView } from './SplitView';
 import { TracePanel } from './TracePanel';
 import { TranscriptLane } from './TranscriptLane';
 import { VideoPlayer } from './VideoPlayer';
-import { useLogout } from '../api/auth';
+import { useLogout, useMe } from '../api/auth';
 import { useLectures } from '../api/lectures';
+import { useStudents } from '../api/students';
 import { useActiveContradiction } from '../contradictions/activeContradiction';
 import { useNavStack } from '../nav/navStack';
 import { registerRouterContext, returnToOrigin } from '../nav/navigate';
+import { useSelectedStudent } from '../students/selectedStudent';
 
 interface AppShellProps {
   view: 'course' | 'lecture';
@@ -31,6 +34,7 @@ export function AppShell({ view }: AppShellProps) {
   const [searchParams] = useSearchParams();
   const routerNavigate = useNavigate();
   const activeContradiction = useActiveContradiction((s) => s.active);
+  const { data: me } = useMe();
   const { data: lectures } = useLectures();
   const currentLecture = lectures?.find((l) => l.id === id);
   const [courseCollapsed, setCourseCollapsed] = useState(false);
@@ -86,19 +90,25 @@ export function AppShell({ view }: AppShellProps) {
         <Link to="/" className="font-[var(--font-display)] text-[var(--step-1)]">
           Course Factory
         </Link>
-        <div className="flex gap-[var(--s-3)]">
-          <Link to="/upload" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
-            Upload a lecture
-          </Link>
+        <div className="flex flex-wrap items-center gap-[var(--s-3)]">
+          {me?.role === 'instructor' && <StudentSwitcher />}
           <Link to="/drill" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
             Due reviews
           </Link>
-          <Link to="/review" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
-            Instructor queue
-          </Link>
-          <Link to="/waitlist" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
-            Waitlist
-          </Link>
+          {me?.role === 'instructor' && (
+            <>
+              <Link to="/upload" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
+                Upload a lecture
+              </Link>
+              <Link to="/review" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
+                Instructor queue
+              </Link>
+              <Link to="/waitlist" className="text-[var(--step--1)] text-[var(--path)] underline underline-offset-2">
+                Waitlist
+              </Link>
+            </>
+          )}
+          {me?.role === 'student' && <LinkTelegramCard />}
           <LogoutButton />
         </div>
       </header>
@@ -213,6 +223,34 @@ export function LogoutButton() {
     >
       Log out
     </button>
+  );
+}
+
+// Instructor-only (rendered conditionally above) — picks whose
+// mastery/lecture/graph data the rest of the app shows. A plain native
+// <select>, not a custom dropdown component: this codebase deliberately
+// has no component library beyond Tailwind, and a native select is the
+// simplest thing that actually works here.
+function StudentSwitcher() {
+  const { data: students } = useStudents();
+  const studentId = useSelectedStudent((s) => s.studentId);
+  const setStudentId = useSelectedStudent((s) => s.setStudentId);
+
+  if (!students || students.length === 0) return null;
+
+  return (
+    <select
+      value={studentId ?? ''}
+      onChange={(e) => setStudentId(e.target.value || null)}
+      className="rounded-[var(--radius)] border border-[var(--slate-line)] bg-[var(--slate)] px-[var(--s-2)] py-[var(--s-1)] text-[var(--step--1)] text-[var(--chalk)]"
+    >
+      <option value="">Demo student</option>
+      {students.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.name ?? s.username}
+        </option>
+      ))}
+    </select>
   );
 }
 

@@ -63,9 +63,10 @@ needs the auth block filled in for real — the app 401s on every route until
 these exist:
 
 ```bash
-# One admin account gates the whole app (still no multi-tenancy — see
-# CLAUDE.md's original "one student, one instructor" scope; this makes it
-# a real login instead of an open door).
+# One admin account gates the whole app (this makes it a real login
+# instead of an open door). Real student accounts (Stage 15) are provisioned
+# separately, at runtime, via the waitlist's "Create account" flow — they
+# don't need anything in .env; only the single instructor account does.
 #
 # base64, not the raw bcrypt string — a literal $ in a Compose env_file
 # value gets silently corrupted by Compose's own interpolation (confirmed
@@ -206,11 +207,14 @@ with the actual recovery step documented there.
 
 ## What's still out of scope
 
-- **Still single-tenant.** One login gates the whole app — there's no
-  per-student account system, registration flow, or course enrollment.
-  That's a materially bigger project than "add auth," and wasn't asked
-  for; this makes the existing one-student/one-instructor model safe to
-  put a public URL on, it doesn't turn it into multi-user SaaS.
+- **Still no self-service registration or course enrollment.** Stage 15
+  added real, separate per-student accounts (`students.username`/
+  `password_hash`, a `role` claim in the JWT — see `gateway/app/auth.py`),
+  but they're admin-provisioned only, created by extending the waitlist's
+  "Create account" flow (`gateway/app/routes/waitlist.py`) — `/signup`
+  still only ever joins the waitlist. Still one shared course for every
+  student, still exactly two roles (instructor / student), not a rebuild
+  into multi-tenant SaaS with per-student course ownership.
 - **No horizontal scaling, no CDN, no managed database.** This is a
   single-VPS deployment for a real but small-scale tool, not
   infrastructure sized for many concurrent users.

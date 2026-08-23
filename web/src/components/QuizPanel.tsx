@@ -1,11 +1,8 @@
 import { useState } from 'react';
 import { useQuiz, useSubmitAttempt, type AttemptResult } from '../api/quiz';
 import { seekTo } from '../player/playerControls';
+import { useEffectiveStudentId } from '../students/useEffectiveStudentId';
 import { RemediationCard } from './RemediationCard';
-
-// Matches gateway/app/config.py's DEMO_STUDENT_ID default — one hardcoded
-// student for this build, per CLAUDE.md.
-const DEMO_STUDENT_ID = 's1';
 
 interface QuizPanelProps {
   lectureId: string;
@@ -14,6 +11,7 @@ interface QuizPanelProps {
 export function QuizPanel({ lectureId }: QuizPanelProps) {
   const { data: questions, isPending, isError } = useQuiz(lectureId);
   const submitAttempt = useSubmitAttempt();
+  const studentId = useEffectiveStudentId();
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [result, setResult] = useState<AttemptResult | null>(null);
@@ -57,7 +55,7 @@ export function QuizPanel({ lectureId }: QuizPanelProps) {
   function onSubmit() {
     if (!selected) return;
     submitAttempt.mutate(
-      { questionId: question.id, chosenOptionId: selected, studentId: DEMO_STUDENT_ID },
+      { questionId: question.id, chosenOptionId: selected, studentId },
       { onSuccess: (data) => setResult(data) },
     );
   }

@@ -5,9 +5,10 @@ from pydantic import BaseModel
 
 from app.auth import (
     COOKIE_NAME,
+    Identity,
     cookie_token_from_headers,
     create_session_token,
-    verify_credentials,
+    resolve_login,
     verify_session_token,
 )
 
@@ -34,13 +35,18 @@ class LoginRequest(BaseModel):
 class MeResponse(BaseModel):
     authenticated: bool
     username: str | None = None
+    role: str | None = None
+    student_id: str | None = None
 
 
 @router.post("/auth/login")
-async def login(body: LoginRequest, response: Response) -> MeResponse:
-    if not verify_credentials(body.username, body.password):
+async def login(request: Request, body: LoginRequest, response: Response) -> MeResponse:
+    async with request.app.state.pool.acquire() as conn:
+        identity = await resolve_login(conn, body.username, body.password)
+    if identity is None:
         raise HTTPException(status_code=401, detail="Wrong username or password.")
-    token = create_session_token(body.username)
+
+    token = create_session_token(identity)
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
@@ -50,7 +56,7 @@ async def login(body: LoginRequest, response: Response) -> MeResponse:
         secure=COOKIE_SECURE,
         path="/",
     )
-    return MeResponse(authenticated=True, username=body.username)
+    return MeResponse(authenticated=True, username=identity.username, role=identity.role, student_id=identity.student_id)
 
 
 @router.post("/auth/logout")
@@ -65,4 +71,5 @@ async def me(request: Request) -> MeResponse:
     payload = verify_session_token(token) if token else None
     if not payload:
         return MeResponse(authenticated=False)
-    return MeResponse(authenticated=True, username=payload["sub"])
+    identity = Identity(role=payload["role"], student_id=payload.get("student_id"), username=payload["sub"])
+    return MeResponse(authenticated=True, username=identity.username, role=identity.role, student_id=identity.student_id)

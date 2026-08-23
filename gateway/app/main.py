@@ -8,7 +8,22 @@ from app.auth_middleware import AuthMiddleware
 from app.config import PUBLIC_HOST
 from app.db import lifespan
 from app.errors import install as install_error_handlers
-from app.routes import auth, contradictions, graph, health, jobs, lectures, quiz, remediation, review_queue, search, upload, waitlist
+from app.routes import (
+    auth,
+    contradictions,
+    graph,
+    health,
+    jobs,
+    lectures,
+    quiz,
+    remediation,
+    review_queue,
+    search,
+    students,
+    telegram,
+    upload,
+    waitlist,
+)
 from app.ws import router as ws_router
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -43,6 +58,8 @@ v1.include_router(contradictions.router)
 v1.include_router(jobs.router)
 v1.include_router(upload.router)
 v1.include_router(waitlist.router)
+v1.include_router(telegram.router)
+v1.include_router(students.router)
 
 app.include_router(v1)
 app.include_router(ws_router)

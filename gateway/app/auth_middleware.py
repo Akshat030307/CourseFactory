@@ -19,9 +19,16 @@ Stage 14: PUBLIC_METHOD_PATHS handles the one route where the SAME path
 needs different auth by HTTP method — POST /waitlist (anyone can join) vs
 GET /waitlist (only a logged-in admin can see who's on it). Everything
 else in this file is path-only; this is deliberately the one exception
-rather than a reason to redesign the whole allowlist around methods."""
+rather than a reason to redesign the whole allowlist around methods.
 
-from app.auth import is_authorized
+Stage 15: authorization now resolves to a full Identity (role + student_id),
+not just a bool, and that Identity is stashed on the ASGI scope's `state`
+here so route handlers can read `request.state.identity` directly instead
+of every route re-decoding the cookie itself the way auth.py's me() does.
+This is the one place this file does more than gate — worth it to avoid
+duplicating JWT-decode logic across five route files."""
+
+from app.auth import resolve_identity
 
 PUBLIC_PATHS = {
     "/api/v1/health",
@@ -61,7 +68,9 @@ class AuthMiddleware:
         cookie_header = _header(headers, b"cookie")
         auth_header = _header(headers, b"authorization")
 
-        if is_authorized(cookie_header, auth_header):
+        identity = resolve_identity(cookie_header, auth_header)
+        if identity is not None:
+            scope.setdefault("state", {})["identity"] = identity
             await self.app(scope, receive, send)
             return
 

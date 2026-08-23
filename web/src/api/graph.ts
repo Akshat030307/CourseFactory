@@ -20,16 +20,22 @@ export interface CourseGraph {
   edges: GraphEdge[];
 }
 
-async function fetchGraph(courseId: string): Promise<CourseGraph> {
-  const res = await apiFetch(`/api/v1/courses/${courseId}/graph`);
+async function fetchGraph(courseId: string, studentId?: string): Promise<CourseGraph> {
+  const qs = studentId ? `?student_id=${encodeURIComponent(studentId)}` : '';
+  const res = await apiFetch(`/api/v1/courses/${courseId}/graph${qs}`);
   if (!res.ok) throw new Error(`Failed to fetch graph: ${res.status}`);
   return res.json();
 }
 
-export function useGraph(courseId: string) {
+// studentId in the query key: the graph's edges/nodes are rebuilt only by
+// scripts/build_graph.py (hence staleTime: Infinity), but each node's
+// per-student `mastery` overlay changes with who's selected — omitting
+// studentId from the key would keep serving a previous student's mastery
+// after switching.
+export function useGraph(courseId: string, studentId?: string) {
   return useQuery({
-    queryKey: ['graph', courseId],
-    queryFn: () => fetchGraph(courseId),
-    staleTime: Infinity, // rebuilt only by re-running scripts/build_graph.py
+    queryKey: ['graph', courseId, studentId ?? null],
+    queryFn: () => fetchGraph(courseId, studentId),
+    staleTime: Infinity,
   });
 }
