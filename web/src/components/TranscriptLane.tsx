@@ -65,12 +65,16 @@ export function TranscriptLane({ lectureId }: TranscriptLaneProps) {
             <button
               ref={isActive ? activeRef : undefined}
               onClick={() => seekTo(lectureId, seg.start_ms)}
-              className={`flex-1 rounded-[var(--radius)] px-[var(--s-2)] py-[var(--s-1)] text-left transition-colors ${
+              title={seg.text}
+              className={`flex min-w-0 flex-1 items-baseline gap-[var(--s-2)] rounded-[var(--radius)] px-[var(--s-2)] py-[var(--s-1)] text-left transition-colors ${
                 isActive ? 'bg-[var(--path-dim)] text-[var(--chalk)]' : 'text-[var(--dust)] hover:bg-[var(--slate-line)]'
               }`}
             >
-              <span className="ts mr-[var(--s-2)]">{formatTimestamp(seg.start_ms)}</span>
-              {seg.text}
+              <span className="ts shrink-0">{formatTimestamp(seg.start_ms)}</span>
+              {/* Captions read as one line at a time, like real captions —
+                  not a wrapped paragraph. Full text still reachable via the
+                  title tooltip on hover for anything actually truncated. */}
+              <span className="truncate">{seg.text}</span>
             </button>
             {contradiction && (
               <button

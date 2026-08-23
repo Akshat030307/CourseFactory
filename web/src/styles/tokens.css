@@ -38,19 +38,22 @@
   --ok:           #7FA86F;
 
   /* ---- type ----
-     One face everywhere (Inter) rather than a separate display face —
-     plainer, more uniform "SaaS product" feel than the old two-typeface
-     system. Mono on every timestamp is still FUNCTIONAL, not stylistic —
-     timestamps get compared constantly and proportional digits jitter. */
-  --font-display: 'Inter', system-ui, sans-serif;
-  --font-body:    'Inter', system-ui, sans-serif;
+     PT Serif everywhere per direct instruction — one exception: --font-mono
+     stays monospace for timestamps specifically, because that one is
+     functional, not stylistic (proportional/serif digit widths jitter as
+     they're compared during scrubbing — PT Serif is neither monospace nor
+     tabular). Flagged rather than silently kept sans; a literal 100% swap
+     is one line to change if that tradeoff isn't wanted.
+     Scale trimmed down a step from the previous pass — smaller throughout. */
+  --font-display: 'PT Serif', Georgia, serif;
+  --font-body:    'PT Serif', Georgia, serif;
   --font-mono:    'JetBrains Mono', ui-monospace, monospace;
 
-  --step--1: 0.833rem;
-  --step-0:  1rem;
-  --step-1:  1.25rem;
-  --step-2:  1.6rem;
-  --step-3:  2.1rem;
+  --step--1: 0.75rem;
+  --step-0:  0.875rem;
+  --step-1:  1.05rem;
+  --step-2:  1.3rem;
+  --step-3:  1.7rem;
 
   /* ---- space ---- */
   --s-1: 0.25rem;  --s-2: 0.5rem;  --s-3: 0.75rem;

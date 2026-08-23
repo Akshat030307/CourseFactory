@@ -335,7 +335,7 @@ function HowItWorks() {
         How it works
       </h2>
       <div className="mx-auto flex max-w-5xl flex-col gap-[var(--s-3)] md:flex-row md:items-start">
-        {steps.map((s, i) => (
+        {steps.map((s) => (
           <div key={s.n} className="flex flex-1 items-start gap-[var(--s-3)] md:flex-col">
             <span
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
@@ -351,11 +351,6 @@ function HowItWorks() {
                 {s.body}
               </p>
             </div>
-            {i < steps.length - 1 && (
-              <span className="hidden md:block" style={{ color: GOLD_DIM }}>
-                →
-              </span>
-            )}
           </div>
         ))}
       </div>
